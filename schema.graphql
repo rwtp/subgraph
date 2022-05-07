@@ -1,0 +1,6 @@
+type ExampleEntity @entity {
+  id: ID!
+  count: BigInt!
+  previous: BigInt! # uint256
+  next: BigInt! # uint256
+}
