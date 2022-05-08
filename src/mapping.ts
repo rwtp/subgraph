@@ -64,6 +64,7 @@ export function handleSellOrderCreated(event: SellOrderCreated): void {
   entity.address = event.params.sellOrder;
   let sellOrderContract = SellOrderContract.bind(event.params.sellOrder);
   entity.uri = sellOrderContract.orderURI();
+  entity.sellersStake = sellOrderContract.orderStake();
 
   if (entity.uri.startsWith("ipfs://")) {
     let cid = entity.uri.substring("ipfs://".length);

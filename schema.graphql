@@ -2,6 +2,7 @@ type SellOrder @entity {
   id: ID!
   address: Bytes!
   uri: String!
+  sellersStake: BigInt!,
   title: String, 
   description: String,
   primaryImage: String,
