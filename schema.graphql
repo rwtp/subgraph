@@ -1,5 +1,12 @@
 type SellOrder @entity {
   id: ID!
   address: Bytes!
-  
+  uri: String!
+  title: String, 
+  description: String,
+  primaryImage: String,
+  encryptionPublicKey: String, 
+  priceSuggested: String,
+  stakeSuggested: String,
+  error: String
 }

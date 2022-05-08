@@ -19,7 +19,9 @@ dataSources:
         - SellOrderCreated
       abis:
         - name: OrderBook
-          file: ./abis/OrderBook.json
+          file: ./node_modules/rwtp/out/OrderBook.sol/OrderBook.json
+        - name: SellOrder
+          file: ./node_modules/rwtp/out/SellOrder.sol/SellOrder.json
       eventHandlers:
         - event: FeeChanged(uint256,uint256)
           handler: handleFeeChanged
