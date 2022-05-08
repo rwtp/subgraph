@@ -1,0 +1,32 @@
+specVersion: 0.0.2
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: OrderBook
+    network: rinkeby
+    source:
+      address: "0x667D3DED6C891453E4b1BF6032CD0c22E0c31baC"
+      abi: OrderBook
+      startBlock: 10631244
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.5
+      language: wasm/assemblyscript
+      entities:
+        - FeeChanged
+        - OwnerChanged
+        - SellOrderCreated
+      abis:
+        - name: OrderBook
+          file: ./node_modules/rwtp/out/OrderBook.sol/OrderBook.json
+        - name: SellOrder
+          file: ./node_modules/rwtp/out/SellOrder.sol/SellOrder.json
+      eventHandlers:
+        - event: FeeChanged(uint256,uint256)
+          handler: handleFeeChanged
+        - event: OwnerChanged(address,address)
+          handler: handleOwnerChanged
+        - event: SellOrderCreated(indexed address)
+          handler: handleSellOrderCreated
+      file: ./src/mapping.ts
