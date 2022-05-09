@@ -31,19 +31,20 @@ function getEntryString(typedMap: TypedMap<string, JSONValue>, key: string): str
 ///   "priceSuggested": "0x000011",
 ///   "stakeSuggested": "0x024000",
 /// }
-function load_ipfs_meta_data(cid: string, sellOrder: SellOrder): void {
+function load_ipfs_meta_data(uri: string, sellOrder: SellOrder): SellOrder {
+  const cid = uri.replace("ipfs://", "");
   let data = ipfs.cat(cid);
   if (!data) {
     sellOrder.error = `IPFS data not found for ${cid}`;
-    log.error("Unable to get data at: {}", [cid]);
-    return;
-  }
+    log.warning("Unable to get data at: {}", [cid]);
+    return sellOrder;
+  } 
   const tryValue = json.try_fromBytes(data);
   const typedMap = tryValue.value.toObject();
   if (!typedMap) {
     sellOrder.error = `invalid IPFS data for ${cid}`;
-    log.error("Unable to parse data at: {}", [cid]);
-    return;
+    log.warning("Unable to parse data at: {}", [cid]);
+    return sellOrder;
   }
   sellOrder.title = getEntryString(typedMap, "title");
   sellOrder.description = getEntryString(typedMap, "description");
@@ -51,14 +52,15 @@ function load_ipfs_meta_data(cid: string, sellOrder: SellOrder): void {
   sellOrder.encryptionPublicKey = getEntryString(typedMap, "encryptionPublicKey");
   sellOrder.priceSuggested = getEntryString(typedMap, "priceSuggested");
   sellOrder.stakeSuggested = getEntryString(typedMap, "stakeSuggested");
+  return sellOrder;
 }
 
 export function handleSellOrderCreated(event: SellOrderCreated): void {
-  let entity = SellOrder.load(event.transaction.from.toHex())
+  const sellOrderAddress = event.params.sellOrder.toHex();
+  log.info("SellOrderCreated: {}", [sellOrderAddress]);
+  let entity = SellOrder.load(sellOrderAddress);
   if (!entity) {
-    entity = new SellOrder(event.transaction.from.toHex())
- 
-    // Entity fields can be set using simple assignments
+    entity = new SellOrder(sellOrderAddress);
   }
   // BigInt and BigDecimal math are supported
   entity.address = event.params.sellOrder;
@@ -66,10 +68,7 @@ export function handleSellOrderCreated(event: SellOrderCreated): void {
   entity.uri = sellOrderContract.orderURI();
   entity.sellersStake = sellOrderContract.orderStake();
 
-  if (entity.uri.startsWith("ipfs://")) {
-    let cid = entity.uri.substring("ipfs://".length);
-    load_ipfs_meta_data(cid, entity);
-  }
+  entity = load_ipfs_meta_data(entity.uri, entity);
   // Entities can be written to the store with `.save()`
   entity.save()
 }
