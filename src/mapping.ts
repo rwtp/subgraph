@@ -6,8 +6,9 @@ import {
   SellOrderCreated
 } from "../generated/OrderBook/OrderBook"
 import { SellOrder } from "../generated/schema"
-import { SellOrder as SellOrderContract } from "../generated/OrderBook/SellOrder"
+import { SellOrder as SellOrderContract } from "../generated/templates/SellOrder/SellOrder"
 
+import * as templates from "../generated/templates"
 
 export function handleFeeChanged(event: FeeChanged): void {}
 
@@ -55,7 +56,10 @@ function load_ipfs_meta_data(uri: string, sellOrder: SellOrder): SellOrder {
   return sellOrder;
 }
 
+
 export function handleSellOrderCreated(event: SellOrderCreated): void {
+  log.info("Creating template2", []);
+  // templates.SellOrder.create(event.params.sellOrder);
   const sellOrderAddress = event.params.sellOrder.toHex();
   log.info("SellOrderCreated: {}", [sellOrderAddress]);
   let entity = SellOrder.load(sellOrderAddress);

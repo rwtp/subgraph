@@ -11,3 +11,14 @@ type SellOrder @entity {
   stakeSuggested: String,
   error: String
 }
+
+
+type Offer @entity {
+  id: ID!
+  buyer_address: Bytes!
+  index: BigInt!
+  quantity: BigInt!
+  pricePerUnit: BigInt!
+  stakePerUnit: BigInt!
+  uri: String
+}
