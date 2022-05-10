@@ -1,12 +1,13 @@
-import { ipfs, json, TypedMap, JSONValue, log} from "@graphprotocol/graph-ts"
+import { ipfs, json, TypedMap, JSONValue, log, BigInt} from "@graphprotocol/graph-ts"
 import {
   OrderBook,
   FeeChanged,
   OwnerChanged,
   SellOrderCreated
 } from "../generated/OrderBook/OrderBook"
-import { SellOrder } from "../generated/schema"
+import { SellOrder, Token} from "../generated/schema"
 import { SellOrder as SellOrderContract } from "../generated/templates/SellOrder/SellOrder"
+import { ERC20 } from "../generated/OrderBook/ERC20"
 
 import * as templates from "../generated/templates"
 
@@ -58,8 +59,7 @@ function load_ipfs_meta_data(uri: string, sellOrder: SellOrder): SellOrder {
 
 
 export function handleSellOrderCreated(event: SellOrderCreated): void {
-  log.info("Creating template2", []);
-  // templates.SellOrder.create(event.params.sellOrder);
+  templates.SellOrder.create(event.params.sellOrder);
   const sellOrderAddress = event.params.sellOrder.toHex();
   log.info("SellOrderCreated: {}", [sellOrderAddress]);
   let entity = SellOrder.load(sellOrderAddress);
@@ -69,10 +69,36 @@ export function handleSellOrderCreated(event: SellOrderCreated): void {
   // BigInt and BigDecimal math are supported
   entity.address = event.params.sellOrder;
   let sellOrderContract = SellOrderContract.bind(event.params.sellOrder);
+  
+
+  // TOKEN STUFF
+  let tokenAddress = sellOrderContract.token();
+  let tokenEntity = Token.load(tokenAddress.toHex());
+  if (!tokenEntity) {
+    tokenEntity = new Token(tokenAddress.toHex());
+  }
+  tokenEntity.address = tokenAddress;
+  let tokenContract = ERC20.bind(tokenAddress);
+  if (!tokenContract) {
+    entity.error = "Token contract not found";
+    log.warning("Token contract not found {}", [tokenAddress.toHex()]);
+  } else {
+    tokenEntity.name = tokenContract.name();
+    tokenEntity.symbol = tokenContract.symbol();
+    tokenEntity.decimals = BigInt.fromI32(tokenContract.decimals());
+    tokenEntity.totalSupply = tokenContract.totalSupply();
+    tokenEntity.save();
+    entity.token = tokenEntity.id;
+  }
+  entity.seller = sellOrderContract.seller();
+  entity.timeout = sellOrderContract.timeout();
+
+
   entity.uri = sellOrderContract.orderURI();
   entity.sellersStake = sellOrderContract.orderStake();
 
   entity = load_ipfs_meta_data(entity.uri, entity);
+  entity.offers = [];
   // Entities can be written to the store with `.save()`
   entity.save()
 }
