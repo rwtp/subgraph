@@ -22,6 +22,8 @@ dataSources:
           file: ./node_modules/rwtp/out/OrderBook.sol/OrderBook.json
         - name: SellOrder
           file: ./node_modules/rwtp/out/SellOrder.sol/SellOrder.json
+        - name: ERC20
+          file: ./abis/erc20.json
       eventHandlers:
         - event: FeeChanged(uint256,uint256)
           handler: handleFeeChanged
@@ -43,7 +45,7 @@ templates:
       language: wasm/assemblyscript
       file: ./src/sell_order.ts
       entities:
-        - SellOrder
+        - OfferSubmitted
       abis:
         - name: SellOrder
           file: ./node_modules/rwtp/out/SellOrder.sol/SellOrder.json

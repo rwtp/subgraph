@@ -10,15 +10,29 @@ type SellOrder @entity {
   priceSuggested: String,
   stakeSuggested: String,
   error: String
+  offers: [Offer!]!
+  token: Token
+  seller: Bytes!
+  timeout: BigInt!
 }
 
 
 type Offer @entity {
   id: ID!
-  buyer_address: Bytes!
+  buyerAddress: Bytes!
+  sellerAddress: Bytes
   index: BigInt!
   quantity: BigInt!
   pricePerUnit: BigInt!
   stakePerUnit: BigInt!
-  uri: String
+  uri: String!
+}
+
+type Token @entity {
+  id: ID!
+  address: Bytes!
+  name: String!
+  symbol: String!
+  totalSupply: BigInt!
+  decimals: BigInt!
 }
