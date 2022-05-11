@@ -84,7 +84,7 @@ function create_sell_order(sellOrderAddress: Address, timestamp: BigInt): SellOr
   }
   let sellOrderContract = SellOrderContract.bind(sellOrderAddress);
 
-  sellOrderEntity.timestamp = timestamp;
+  sellOrderEntity.createdAt = timestamp;
   sellOrderEntity.address = sellOrderAddress;
   sellOrderEntity.offers = [];
   sellOrderEntity = load_erc20_data(sellOrderContract.token(), sellOrderEntity);

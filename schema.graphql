@@ -22,7 +22,7 @@ type SellOrder @entity {
   tokenAddress: Bytes!
   seller: Bytes!
   timeout: BigInt!
-  timestamp: BigInt!
+  createdAt: BigInt!
 }
 
 
@@ -35,7 +35,7 @@ type Offer @entity {
   pricePerUnit: BigInt!
   stakePerUnit: BigInt!
   uri: String!
-  timestamp: BigInt!
+  createdAt: BigInt!
 }
 
 type Token @entity {

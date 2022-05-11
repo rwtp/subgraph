@@ -17,7 +17,7 @@ export function handleOfferSubmitted(event: OfferSubmitted): void {
   entity.quantity = event.params.quantity;
   entity.stakePerUnit = event.params.stakePerUnit;
   entity.uri = event.params.uri;
-  entity.timestamp = event.block.timestamp;
+  entity.createdAt = event.block.timestamp;
   entity.save();
   const sellerAddress = event.transaction.to;
   if (sellerAddress === null) {
