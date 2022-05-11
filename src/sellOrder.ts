@@ -10,8 +10,8 @@ export function handleOfferSubmitted(event: OfferSubmitted): void {
   if (!entity) {
     entity = new Offer(eventAddress);
   }
-  entity.sellerAddress = event.transaction.to;
-  entity.buyerAddress = event.params.buyer;
+  entity.seller = event.transaction.to;
+  entity.buyer = event.params.buyer;
   entity.index = event.params.index;
   entity.pricePerUnit = event.params.pricePerUnit;
   entity.quantity = event.params.quantity;

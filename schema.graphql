@@ -36,8 +36,8 @@ type SellOrder @entity {
 
 type Offer @entity {
   id: ID!
-  buyerAddress: Bytes!
-  sellerAddress: Bytes
+  buyer: Bytes!
+  seller: Bytes
   index: BigInt!
   quantity: BigInt!
   pricePerUnit: BigInt!
