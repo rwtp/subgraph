@@ -31,7 +31,7 @@ dataSources:
           handler: handleOwnerChanged
         - event: SellOrderCreated(indexed address)
           handler: handleSellOrderCreated
-      file: ./src/mapping.ts
+      file: ./src/orderBook.ts
 
 templates:
   - name: SellOrder
@@ -43,7 +43,7 @@ templates:
       kind: ethereum/events
       apiVersion: 0.0.5
       language: wasm/assemblyscript
-      file: ./src/sell_order.ts
+      file: ./src/sellOrder.ts
       entities:
         - OfferSubmitted
       abis:
