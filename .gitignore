@@ -2,3 +2,4 @@ build/
 node_modules
 generated
 yarn.lock
+.vscode
