@@ -1,3 +1,11 @@
+type _Schema_
+  @fulltext(
+    name: "sellOrderSearch"
+    language: en
+    algorithm: rank
+    include: [{ entity: "SellOrder", fields: [{ name: "title" }, { name: "description" }] }]
+  )
+
 type OrderBook @entity {
   id: ID!
   orders: [SellOrder!]!
