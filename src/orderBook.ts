@@ -74,7 +74,7 @@ function load_erc20_data(tokenAddress: Address, sellOrder: SellOrder): SellOrder
   return sellOrder;
 }
 
-function create_sell_order(sellOrderAddress: Address): SellOrder {
+function create_sell_order(sellOrderAddress: Address, timestamp: BigInt): SellOrder {
   let sellOrderEntity = SellOrder.load(sellOrderAddress.toHex());
   if (!sellOrderEntity) {
     sellOrderEntity = new SellOrder(sellOrderAddress.toHex());
@@ -84,6 +84,7 @@ function create_sell_order(sellOrderAddress: Address): SellOrder {
   }
   let sellOrderContract = SellOrderContract.bind(sellOrderAddress);
 
+  sellOrderEntity.timestamp = timestamp;
   sellOrderEntity.address = sellOrderAddress;
   sellOrderEntity.offers = [];
   sellOrderEntity = load_erc20_data(sellOrderContract.token(), sellOrderEntity);
@@ -101,7 +102,7 @@ function create_sell_order(sellOrderAddress: Address): SellOrder {
 export function handleSellOrderCreated(event: SellOrderCreated): void {
   let sellOrderAddress = event.params.sellOrder;
   templates.SellOrder.create(sellOrderAddress);
-  let sellOrderEntity = create_sell_order(sellOrderAddress);
+  let sellOrderEntity = create_sell_order(sellOrderAddress, event.block.timestamp);
   let orderBookAddress = event.address;
   let orderBookEntity = OrderBook.load(orderBookAddress.toHex());
   if (!orderBookEntity) {

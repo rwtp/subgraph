@@ -22,6 +22,7 @@ type SellOrder @entity {
   tokenAddress: Bytes!
   seller: Bytes!
   timeout: BigInt!
+  timestamp: BigInt!
 }
 
 
