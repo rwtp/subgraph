@@ -18,7 +18,7 @@ export function handleOfferSubmitted(event: OfferSubmitted): void {
   entity.stakePerUnit = event.params.stakePerUnit;
   entity.uri = event.params.uri;
   entity.createdAt = event.block.timestamp;
-  entity.offerState = "Closed";
+  entity.state = "Closed";
   entity.save();
   const sellerAddress = event.transaction.to;
   if (sellerAddress === null) {
