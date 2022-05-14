@@ -30,7 +30,7 @@ type SellOrder @entity {
   priceSuggested: String
   stakeSuggested: String
   error: String
-  offers: [OfferSentinel!]!
+  offers: [Offer!]!
   token: Token
   tokenAddress: Bytes!
   seller: Bytes!
@@ -42,19 +42,21 @@ enum OfferState {
   Closed
   Open
   Committed
+  Confirmed
+  Canceled
+  Enforced
 }
 
-type OfferSentinel @entity {
+type OfferTransition @entity {
   id: ID!
-  buyer: Bytes!
-  index: BigInt!
-  offer: Offer!
-  offers: [Offer!]!
+  timestamp: BigInt!
+  state: OfferState!
+  sellerCanceled: Boolean!
+  buyerCanceled: Boolean!
 }
 
 type Offer @entity {
   id: ID!
-  isCurrent: Boolean!
   buyer: Bytes!
   index: BigInt!
   quantity: BigInt!
@@ -68,7 +70,7 @@ type Offer @entity {
   acceptedAt: BigInt!
   sellerCanceled: Boolean!
   buyerCanceled: Boolean!
-  event: String!
+  history: [OfferTransition!]!
 }
 
 type Token @entity {
