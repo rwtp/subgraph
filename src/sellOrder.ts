@@ -151,6 +151,7 @@ function updateOfferState(
   offerEntity.save();
 
   sellOrder.offers = sellOrder.offers.concat([offerEntity.id]);
+  sellOrder.offerCount = BigInt.fromI64(sellOrder.offers.length);
   
   sellOrder.save();
   

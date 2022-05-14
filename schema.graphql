@@ -31,6 +31,7 @@ type SellOrder @entity {
   stakeSuggested: String
   error: String
   offers: [Offer!]!
+  offerCount: BigInt!
   token: Token
   tokenAddress: Bytes!
   seller: Bytes!
