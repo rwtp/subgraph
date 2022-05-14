@@ -61,7 +61,7 @@ function updateOfferState(
     offerSentinel.offers.length.toString()
   ]);
   if (offerSentinel.offers.length > 0) {
-    const oldOffer = Offer.load(offerSentinel.offers[0]);
+    const oldOffer = Offer.load(offerSentinel.offers[offerSentinel.offers.length-1]);
     if (!oldOffer) {
       log.error("Old offer not found. This should be impossible", []);
       return;
