@@ -15,45 +15,49 @@ import {
   OrderURIChanged,
 } from "../generated/templates/SellOrder/SellOrder";
 import { SellOrder as SellOrderContract } from "../generated/templates/SellOrder/SellOrder";
-import { Offer, SellOrder, OfferSentinel } from "../generated/schema";
+import { Offer, SellOrder, OfferTransition } from "../generated/schema";
 
 function getOffer(
   buyer: Address,
   index: BigInt,
-  transaction_hash: string
+  sellOrderAddress: Address
 ): Offer {
   const offerId =
-    buyer.toHex() + "-" + index.toString() + "-" + transaction_hash;
+    buyer.toHex() + "-" + index.toString() + "-" + sellOrderAddress.toHex();
   let entity = Offer.load(offerId);
   if (!entity) {
     entity = new Offer(offerId);
+    entity.history = [];
   }
   return entity;
 }
 
-function getOfferSentinel(
+function getOfferTransition(
   buyer: Address,
   index: BigInt,
-  sellOrder: Address
-): OfferSentinel {
+  transaction_hash: string
+): OfferTransition {
   const offerId =
-    buyer.toHex() + "-" + index.toString() + "-" + sellOrder.toHex();
-  let entity = OfferSentinel.load(offerId);
+    buyer.toHex() + "-" + index.toString() + "-" + transaction_hash;
+  let entity = OfferTransition.load(offerId);
   if (!entity) {
-    entity = new OfferSentinel(offerId);
-    entity.offers = [];
+    entity = new OfferTransition(offerId);
+  } else {
+    log.error("This should not be possible", []);
   }
   return entity;
 }
 
 const STATE_MAP = ["Closed", "Open", "Committed"];
 
+
+// Sorry this function is long I will clean up i promise :) 
 function updateOfferState(
   sellOrderAddress: Address | null,
   buyer: Address,
   index: BigInt,
   timestamp: BigInt,
-  transaction_hash: string,
+  transactionHash: string,
   event: string
 ): void {
   if (sellOrderAddress === null) {
@@ -61,31 +65,16 @@ function updateOfferState(
     return;
   }
 
-  const offerSentinel = getOfferSentinel(buyer, index, sellOrderAddress);
-  const offerEntity = getOffer(buyer, index, transaction_hash);
-  log.info("updateOfferState: {} {} {} {} {} {}", [
+  const offerEntity = getOffer(buyer, index, sellOrderAddress);
+  
+  log.info("updateOfferState: {} {} {} {} {}", [
     sellOrderAddress.toHex(),
     buyer.toHex(),
     index.toString(),
     timestamp.toString(),
-    transaction_hash,
-    offerSentinel.offers.length.toString(),
+    transactionHash,
   ]);
-  if (offerSentinel.offers.length > 0) {
-    const oldOffer = Offer.load(
-      offerSentinel.offers[offerSentinel.offers.length - 1]
-    );
-    if (!oldOffer) {
-      log.error("Old offer not found. This should be impossible", []);
-      return;
-    }
-    oldOffer.isCurrent = false;
-    oldOffer.save();
-  }
-  offerSentinel.buyer = buyer;
-  offerSentinel.index = index;
-  offerSentinel.offers = offerSentinel.offers.concat([offerEntity.id]);
-  offerSentinel.offer = offerEntity.id;
+  
 
   let sellOrder = SellOrder.load(sellOrderAddress.toHex());
   if (!sellOrder) {
@@ -94,7 +83,12 @@ function updateOfferState(
   }
   let sellOrderContract = SellOrderContract.bind(sellOrderAddress);
 
-  let offerFromContract = sellOrderContract.offers(buyer, index);
+  let tryOfferFromContract = sellOrderContract.try_offers(buyer, index);
+  if (tryOfferFromContract.reverted) {
+    log.error("Offer not found. This should be impossible", []);
+    return
+  }
+  let offerFromContract = tryOfferFromContract.value;
   const state = offerFromContract.value0;
   const pricePerUnit = offerFromContract.value1;
   const stakePerUnit = offerFromContract.value2;
@@ -103,13 +97,38 @@ function updateOfferState(
   const sellerCanceled = offerFromContract.value5;
   const buyerCanceled = offerFromContract.value6;
   const quantity = offerFromContract.value7;
-  if (state >= STATE_MAP.length) {
+
+
+  if (state > STATE_MAP.length) {
     log.error("Invalid state: {}", [state.toString()]);
     return;
   }
-  offerEntity.state = STATE_MAP[state];
+
+  let newState = "";
+  let closed = STATE_MAP[state] === "Closed";
+  if (
+    closed &&
+    (event === "OfferCanceled") &&
+    sellerCanceled && buyerCanceled
+  ) {
+    newState = "Canceled";
+  } else if (closed) {
+    if (event === "OfferEnforced") {
+      newState = "Enforced";
+    } else if (event === "OfferWithdrawn") {
+      newState = "Withdrawn";
+    } else if (event === "OfferConfirmed") {
+      newState = "Confirmed";
+    } else if (event === "OfferEnforced") {
+      newState = "Enforced";
+    }
+  } else {
+    newState = STATE_MAP[state];
+  }
+
+
+  offerEntity.state = newState;
   offerEntity.seller = sellOrder.seller;
-  offerEntity.isCurrent = true;
   offerEntity.buyer = buyer;
   offerEntity.index = index;
   offerEntity.pricePerUnit = pricePerUnit;
@@ -120,14 +139,21 @@ function updateOfferState(
   offerEntity.acceptedAt = acceptedAt;
   offerEntity.sellerCanceled = sellerCanceled;
   offerEntity.buyerCanceled = buyerCanceled;
-  offerEntity.event = event;
-  offerEntity.save();
-  offerSentinel.save();
-  sellOrder.offers = sellOrder.offers.concat([offerSentinel.id]);
 
+  let offerTransition = getOfferTransition(buyer, index, transactionHash);
+  offerTransition.buyerCanceled = buyerCanceled;
+  offerTransition.sellerCanceled = sellerCanceled;
+  offerTransition.state = newState;
+  offerTransition.timestamp = timestamp;
+  offerTransition.save();
+  offerEntity.history = offerEntity.history.concat([offerTransition.id]);
   offerEntity.sellOrder = sellOrder.id;
-  sellOrder.save();
   offerEntity.save();
+
+  sellOrder.offers = sellOrder.offers.concat([offerEntity.id]);
+  
+  sellOrder.save();
+  
 }
 
 export function handleOfferCanceled(event: OfferCanceled): void {
