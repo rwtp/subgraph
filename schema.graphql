@@ -25,7 +25,7 @@ type SellOrder @entity {
   priceSuggested: String
   stakeSuggested: String
   error: String
-  buyers: [OfferSentinel!]!
+  offers: [OfferSentinel!]!
   token: Token
   tokenAddress: Bytes!
   seller: Bytes!
@@ -41,8 +41,10 @@ enum OfferState {
 
 type OfferSentinel @entity {
   id: ID!
-  currentOffer: Offer!
-  offerHistory: [Offer!]!
+  buyer: Bytes!
+  index: BigInt!
+  offer: Offer!
+  offers: [Offer!]!
 }
 
 type Offer @entity {

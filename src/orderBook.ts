@@ -86,7 +86,7 @@ function create_sell_order(sellOrderAddress: Address, timestamp: BigInt): SellOr
 
   sellOrderEntity.createdAt = timestamp;
   sellOrderEntity.address = sellOrderAddress;
-  sellOrderEntity.buyers = [];
+  sellOrderEntity.offers = [];
   sellOrderEntity = load_erc20_data(sellOrderContract.token(), sellOrderEntity);
   sellOrderEntity.seller = sellOrderContract.seller();
   sellOrderEntity.timeout = sellOrderContract.timeout();

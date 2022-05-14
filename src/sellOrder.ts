@@ -26,7 +26,7 @@ function getOfferSentinel(buyer: Address, index: BigInt, sellOrder: Address): Of
   let entity = OfferSentinel.load(offerId);
   if (!entity) {
     entity = new OfferSentinel(offerId);
-    entity.offerHistory = [];
+    entity.offers = [];
   }
   return entity;
 }
@@ -58,10 +58,10 @@ function updateOfferState(
     index.toString(),
     timestamp.toString(),
     transaction_hash,
-    offerSentinel.offerHistory.length.toString()
+    offerSentinel.offers.length.toString()
   ]);
-  if (offerSentinel.offerHistory.length > 0) {
-    const oldOffer = Offer.load(offerSentinel.currentOffer);
+  if (offerSentinel.offers.length > 0) {
+    const oldOffer = Offer.load(offerSentinel.offers[0]);
     if (!oldOffer) {
       log.error("Old offer not found. This should be impossible", []);
       return;
@@ -69,8 +69,11 @@ function updateOfferState(
     oldOffer.isCurrent = false;
     oldOffer.save();
   }
-  offerSentinel.currentOffer = offerEntity.id;
-  offerSentinel.offerHistory = offerSentinel.offerHistory.concat([offerEntity.id]);
+  offerSentinel.buyer = buyer;
+  offerSentinel.index = index;
+  offerSentinel.offers = offerSentinel.offers.concat([offerEntity.id]);
+  offerSentinel.offer = offerEntity.id;
+
 
   let sellOrder = SellOrder.load(sellOrderAddress.toHex());
   if (!sellOrder) {
@@ -111,7 +114,7 @@ function updateOfferState(
   offerEntity.event = event;
   offerEntity.save();
   offerSentinel.save();
-  sellOrder.buyers = sellOrder.buyers.concat([offerSentinel.id]);
+  sellOrder.offers = sellOrder.offers.concat([offerSentinel.id]);
   
   offerEntity.sellOrder = sellOrder.id;
   sellOrder.save();
