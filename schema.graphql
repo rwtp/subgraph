@@ -17,15 +17,15 @@ type SellOrder @entity {
   id: ID!
   address: Bytes!
   uri: String!
-  sellersStake: BigInt!,
-  title: String, 
-  description: String,
-  primaryImage: String,
-  encryptionPublicKey: String, 
-  priceSuggested: String,
-  stakeSuggested: String,
+  sellersStake: BigInt!
+  title: String
+  description: String
+  primaryImage: String
+  encryptionPublicKey: String
+  priceSuggested: String
+  stakeSuggested: String
   error: String
-  offers: [Offer!]!
+  offers: [OfferSentinel!]!
   token: Token
   tokenAddress: Bytes!
   seller: Bytes!
@@ -39,17 +39,31 @@ enum OfferState {
   Committed
 }
 
-type Offer @entity {
+type OfferSentinel @entity {
   id: ID!
   buyer: Bytes!
-  seller: Bytes
+  index: BigInt!
+  offer: Offer!
+  offers: [Offer!]!
+}
+
+type Offer @entity {
+  id: ID!
+  isCurrent: Boolean!
+  buyer: Bytes!
   index: BigInt!
   quantity: BigInt!
   pricePerUnit: BigInt!
   stakePerUnit: BigInt!
   uri: String!
-  createdAt: BigInt!
+  timestamp: BigInt!
   state: OfferState!
+  sellOrder: SellOrder
+  seller: Bytes!
+  acceptedAt: BigInt!
+  sellerCanceled: Boolean!
+  buyerCanceled: Boolean!
+  event: String!
 }
 
 type Token @entity {
