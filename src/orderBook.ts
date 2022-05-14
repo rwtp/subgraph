@@ -1,21 +1,28 @@
-import { ipfs, json, TypedMap, JSONValue, log, BigInt, Address} from "@graphprotocol/graph-ts"
+import {
+  ipfs,
+  json,
+  TypedMap,
+  JSONValue,
+  log,
+  BigInt,
+  Address,
+} from "@graphprotocol/graph-ts";
 import {
   FeeChanged,
   OwnerChanged,
   SellOrderCreated,
   OrderBook as OrderBookContract,
-} from "../generated/OrderBook/OrderBook"
-import { SellOrder, Token, OrderBook } from "../generated/schema"
-import { SellOrder as SellOrderContract } from "../generated/templates/SellOrder/SellOrder"
-import { ERC20 } from "../generated/OrderBook/ERC20"
+} from "../generated/OrderBook/OrderBook";
+import { SellOrder, Token, OrderBook } from "../generated/schema";
+import { SellOrder as SellOrderContract } from "../generated/templates/SellOrder/SellOrder";
+import { ERC20 } from "../generated/OrderBook/ERC20";
 
-import * as templates from "../generated/templates"
-import { getEntryString } from "./entrySafeUnwrap"
+import * as templates from "../generated/templates";
+import { getEntryString } from "./entrySafeUnwrap";
 
 export function handleFeeChanged(event: FeeChanged): void {}
 
 export function handleOwnerChanged(event: OwnerChanged): void {}
-
 
 /// Mutates sellOrder by appending as much data as possible from the ipfs metadata.
 /// ipfs metadata format must be:
@@ -34,7 +41,7 @@ function load_ipfs_meta_data(uri: string, sellOrder: SellOrder): SellOrder {
     sellOrder.error = `IPFS data not found for ${cid}`;
     log.warning("Unable to get data at: {}", [cid]);
     return sellOrder;
-  } 
+  }
   const tryValue = json.try_fromBytes(data);
   const typedMap = tryValue.value.toObject();
   if (!typedMap) {
@@ -45,13 +52,19 @@ function load_ipfs_meta_data(uri: string, sellOrder: SellOrder): SellOrder {
   sellOrder.title = getEntryString(typedMap, "title");
   sellOrder.description = getEntryString(typedMap, "description");
   sellOrder.primaryImage = getEntryString(typedMap, "primaryImage");
-  sellOrder.encryptionPublicKey = getEntryString(typedMap, "encryptionPublicKey");
+  sellOrder.encryptionPublicKey = getEntryString(
+    typedMap,
+    "encryptionPublicKey"
+  );
   sellOrder.priceSuggested = getEntryString(typedMap, "priceSuggested");
   sellOrder.stakeSuggested = getEntryString(typedMap, "stakeSuggested");
   return sellOrder;
 }
 
-function load_erc20_data(tokenAddress: Address, sellOrder: SellOrder): SellOrder {
+function load_erc20_data(
+  tokenAddress: Address,
+  sellOrder: SellOrder
+): SellOrder {
   sellOrder.tokenAddress = tokenAddress;
   let tokenEntity = Token.load(tokenAddress.toHex());
   if (!tokenEntity) {
@@ -74,13 +87,19 @@ function load_erc20_data(tokenAddress: Address, sellOrder: SellOrder): SellOrder
   return sellOrder;
 }
 
-function create_sell_order(sellOrderAddress: Address, timestamp: BigInt): SellOrder {
+function create_sell_order(
+  sellOrderAddress: Address,
+  timestamp: BigInt
+): SellOrder {
   let sellOrderEntity = SellOrder.load(sellOrderAddress.toHex());
   if (!sellOrderEntity) {
     sellOrderEntity = new SellOrder(sellOrderAddress.toHex());
   } else {
     log.error("Sell order already exists: {}", [sellOrderAddress.toHex()]);
-    log.error("This should not be possible, overwriting existing sellOrder", []);
+    log.error(
+      "This should not be possible, overwriting existing sellOrder",
+      []
+    );
   }
   let sellOrderContract = SellOrderContract.bind(sellOrderAddress);
 
@@ -97,19 +116,20 @@ function create_sell_order(sellOrderAddress: Address, timestamp: BigInt): SellOr
   return sellOrderEntity;
 }
 
-
-
 export function handleSellOrderCreated(event: SellOrderCreated): void {
   let sellOrderAddress = event.params.sellOrder;
   templates.SellOrder.create(sellOrderAddress);
-  let sellOrderEntity = create_sell_order(sellOrderAddress, event.block.timestamp);
+  let sellOrderEntity = create_sell_order(
+    sellOrderAddress,
+    event.block.timestamp
+  );
   let orderBookAddress = event.address;
   let orderBookEntity = OrderBook.load(orderBookAddress.toHex());
   if (!orderBookEntity) {
     orderBookEntity = new OrderBook(orderBookAddress.toHex());
     orderBookEntity.orders = [];
   }
-  
+
   let orderBookContract = OrderBookContract.bind(orderBookAddress);
   orderBookEntity.fee = orderBookContract.fee();
   orderBookEntity.owner = orderBookContract.owner();

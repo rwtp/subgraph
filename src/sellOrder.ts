@@ -1,4 +1,10 @@
-import { Address, log, BigInt, TypedMap, ethereum } from "@graphprotocol/graph-ts"
+import {
+  Address,
+  log,
+  BigInt,
+  TypedMap,
+  ethereum,
+} from "@graphprotocol/graph-ts";
 import {
   OfferSubmitted,
   OfferCanceled,
@@ -6,14 +12,18 @@ import {
   OfferConfirmed,
   OfferEnforced,
   OfferWithdrawn,
-  OrderURIChanged
+  OrderURIChanged,
+} from "../generated/templates/SellOrder/SellOrder";
+import { SellOrder as SellOrderContract } from "../generated/templates/SellOrder/SellOrder";
+import { Offer, SellOrder, OfferSentinel } from "../generated/schema";
 
-} from "../generated/templates/SellOrder/SellOrder"
-import { SellOrder as SellOrderContract } from "../generated/templates/SellOrder/SellOrder"
-import { Offer, SellOrder, OfferSentinel} from "../generated/schema"
-
-function getOffer(buyer: Address, index: BigInt, transaction_hash: string): Offer{
-  const offerId = buyer.toHex() + "-" + index.toString() + "-" + transaction_hash;
+function getOffer(
+  buyer: Address,
+  index: BigInt,
+  transaction_hash: string
+): Offer {
+  const offerId =
+    buyer.toHex() + "-" + index.toString() + "-" + transaction_hash;
   let entity = Offer.load(offerId);
   if (!entity) {
     entity = new Offer(offerId);
@@ -21,8 +31,13 @@ function getOffer(buyer: Address, index: BigInt, transaction_hash: string): Offe
   return entity;
 }
 
-function getOfferSentinel(buyer: Address, index: BigInt, sellOrder: Address): OfferSentinel{
-  const offerId = buyer.toHex() + "-" + index.toString() + "-" + sellOrder.toHex();
+function getOfferSentinel(
+  buyer: Address,
+  index: BigInt,
+  sellOrder: Address
+): OfferSentinel {
+  const offerId =
+    buyer.toHex() + "-" + index.toString() + "-" + sellOrder.toHex();
   let entity = OfferSentinel.load(offerId);
   if (!entity) {
     entity = new OfferSentinel(offerId);
@@ -31,19 +46,15 @@ function getOfferSentinel(buyer: Address, index: BigInt, sellOrder: Address): Of
   return entity;
 }
 
-const STATE_MAP = [ 
-  "Closed",
-  "Open",
-  "Committed",
-];
+const STATE_MAP = ["Closed", "Open", "Committed"];
 
 function updateOfferState(
-  sellOrderAddress:  Address | null,
+  sellOrderAddress: Address | null,
   buyer: Address,
   index: BigInt,
   timestamp: BigInt,
   transaction_hash: string,
-  event: string,
+  event: string
 ): void {
   if (sellOrderAddress === null) {
     log.error("Seller address is null", []);
@@ -58,10 +69,12 @@ function updateOfferState(
     index.toString(),
     timestamp.toString(),
     transaction_hash,
-    offerSentinel.offers.length.toString()
+    offerSentinel.offers.length.toString(),
   ]);
   if (offerSentinel.offers.length > 0) {
-    const oldOffer = Offer.load(offerSentinel.offers[offerSentinel.offers.length-1]);
+    const oldOffer = Offer.load(
+      offerSentinel.offers[offerSentinel.offers.length - 1]
+    );
     if (!oldOffer) {
       log.error("Old offer not found. This should be impossible", []);
       return;
@@ -74,7 +87,6 @@ function updateOfferState(
   offerSentinel.offers = offerSentinel.offers.concat([offerEntity.id]);
   offerSentinel.offer = offerEntity.id;
 
-
   let sellOrder = SellOrder.load(sellOrderAddress.toHex());
   if (!sellOrder) {
     log.error("Sell order not found. This should be impossible", []);
@@ -82,10 +94,7 @@ function updateOfferState(
   }
   let sellOrderContract = SellOrderContract.bind(sellOrderAddress);
 
-  let offerFromContract = sellOrderContract.offers(
-    buyer,
-    index
-  );
+  let offerFromContract = sellOrderContract.offers(buyer, index);
   const state = offerFromContract.value0;
   const pricePerUnit = offerFromContract.value1;
   const stakePerUnit = offerFromContract.value2;
@@ -94,7 +103,7 @@ function updateOfferState(
   const sellerCanceled = offerFromContract.value5;
   const buyerCanceled = offerFromContract.value6;
   const quantity = offerFromContract.value7;
-  if(state >= STATE_MAP.length) {
+  if (state >= STATE_MAP.length) {
     log.error("Invalid state: {}", [state.toString()]);
     return;
   }
@@ -115,7 +124,7 @@ function updateOfferState(
   offerEntity.save();
   offerSentinel.save();
   sellOrder.offers = sellOrder.offers.concat([offerSentinel.id]);
-  
+
   offerEntity.sellOrder = sellOrder.id;
   sellOrder.save();
   offerEntity.save();
@@ -186,4 +195,3 @@ export function handleOfferSubmitted(event: OfferSubmitted): void {
 // export function handleOrderURIChanged(event: OrderURIChanged): void {
 
 // }
-

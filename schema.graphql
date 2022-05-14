@@ -3,7 +3,12 @@ type _Schema_
     name: "sellOrderSearch"
     language: en
     algorithm: rank
-    include: [{ entity: "SellOrder", fields: [{ name: "title" }, { name: "description" }] }]
+    include: [
+      {
+        entity: "SellOrder"
+        fields: [{ name: "title" }, { name: "description" }]
+      }
+    ]
   )
 
 type OrderBook @entity {
