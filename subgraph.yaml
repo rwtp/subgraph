@@ -52,3 +52,13 @@ templates:
       eventHandlers:
         - event: OfferSubmitted(indexed address,indexed uint32,uint32,uint128,uint128,string)
           handler: handleOfferSubmitted
+        - event: OrderURIChanged(string,string)
+          handler: handleOrderURIChanged
+        - event: OfferWithdrawn(indexed address,indexed uint32)
+          handler: handleOfferWithdrawn
+        - event: OfferCommitted(indexed address,indexed uint32)
+          handler: handleOfferCommitted
+        - event: OfferConfirmed(indexed address,indexed uint32)
+          handler: handleOfferConfirmed
+        - event: OfferEnforced(indexed address,indexed uint32)
+          handler: handleOfferEnforced
