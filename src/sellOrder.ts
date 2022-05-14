@@ -149,11 +149,11 @@ function updateOfferState(
   offerEntity.history = offerEntity.history.concat([offerTransition.id]);
   offerEntity.sellOrder = sellOrder.id;
   offerEntity.save();
-
-  sellOrder.offers = sellOrder.offers.concat([offerEntity.id]);
-  
-  sellOrder.save();
-  
+  if (!sellOrder.offers.includes(offerEntity.id)) {
+    sellOrder.offers = sellOrder.offers.concat([offerEntity.id]);
+    sellOrder.offerCount = BigInt.fromI64(sellOrder.offers.length);
+    sellOrder.save();
+  }
 }
 
 export function handleOfferCanceled(event: OfferCanceled): void {
