@@ -2,8 +2,8 @@ import {
   Address,
   log,
   BigInt,
-  TypedMap,
-  ethereum,
+  ipfs,
+  json,
 } from "@graphprotocol/graph-ts";
 import {
   OfferSubmitted,
@@ -12,10 +12,10 @@ import {
   OfferConfirmed,
   OfferEnforced,
   OfferWithdrawn,
-  OrderURIChanged,
 } from "../generated/templates/SellOrder/SellOrder";
 import { SellOrder as SellOrderContract } from "../generated/templates/SellOrder/SellOrder";
 import { Offer, SellOrder, OfferTransition } from "../generated/schema";
+import { getEntryString } from "./entrySafeUnwrap";
 
 function getOffer(
   buyer: Address,
@@ -66,7 +66,7 @@ function updateOfferState(
   }
 
   const offerEntity = getOffer(buyer, index, sellOrderAddress);
-  
+
   log.info("updateOfferState: {} {} {} {} {}", [
     sellOrderAddress.toHex(),
     buyer.toHex(),
@@ -74,7 +74,7 @@ function updateOfferState(
     timestamp.toString(),
     transactionHash,
   ]);
-  
+
 
   let sellOrder = SellOrder.load(sellOrderAddress.toHex());
   if (!sellOrder) {
@@ -139,6 +139,26 @@ function updateOfferState(
   offerEntity.acceptedAt = acceptedAt;
   offerEntity.sellerCanceled = sellerCanceled;
   offerEntity.buyerCanceled = buyerCanceled;
+
+  // Get offer metadata from IPFS
+  const cid = uri.replace("ipfs://", "");
+  let data = ipfs.cat(cid);
+  if (!data) {
+    sellOrder.error = `IPFS data not found for ${cid}`;
+    log.warning("Unable to get data at: {}", [cid]);
+    return;
+  }
+  const tryValue = json.try_fromBytes(data);
+  const typedMap = tryValue.value.toObject();
+  if (!typedMap) {
+    sellOrder.error = `invalid IPFS data for ${cid}`;
+    log.warning("Unable to parse data at: {}", [cid]);
+    return;
+  }
+  log.info("Parsing data at {}", [cid]);
+  offerEntity.messagePublicKey = getEntryString(typedMap, "buyersPublicKey");
+  offerEntity.messageNonce = getEntryString(typedMap, "nonce");
+  offerEntity.message = getEntryString(typedMap, "message");
 
   let offerTransition = getOfferTransition(buyer, index, transactionHash);
   offerTransition.buyerCanceled = buyerCanceled;

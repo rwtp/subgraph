@@ -64,6 +64,9 @@ type Offer @entity {
   pricePerUnit: BigInt!
   stakePerUnit: BigInt!
   uri: String!
+  messagePublicKey: String!,
+  messageNonce: String!,
+  message: String!,
   timestamp: BigInt!
   state: OfferState!
   sellOrder: SellOrder
