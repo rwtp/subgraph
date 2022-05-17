@@ -62,3 +62,5 @@ templates:
           handler: handleOfferConfirmed
         - event: OfferEnforced(indexed address,indexed uint32)
           handler: handleOfferEnforced
+        - event: ActiveToggled(bool)
+          handler: handleActiveToggled

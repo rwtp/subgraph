@@ -12,6 +12,7 @@ import {
   OfferConfirmed,
   OfferEnforced,
   OfferWithdrawn,
+  ActiveToggled
 } from "../generated/templates/SellOrder/SellOrder";
 import { SellOrder as SellOrderContract } from "../generated/templates/SellOrder/SellOrder";
 import { Offer, SellOrder, OfferTransition } from "../generated/schema";
@@ -236,6 +237,20 @@ export function handleOfferSubmitted(event: OfferSubmitted): void {
     event.transaction.hash.toHex(),
     "OfferSubmitted"
   );
+}
+
+export function handleActiveToggled(event: ActiveToggled) {
+  const sellOrderAddress = event.transaction.to;
+  if (!sellOrderAddress) {
+    return;
+  }
+  let sellOrder = SellOrder.load(sellOrderAddress.toHex());
+  if (!sellOrder) {
+    log.error("Sell order not found. This should be impossible", []);
+    return;
+  }
+  sellOrder.active = event.params.active;
+  sellOrder.activeUpdatedAt = event.block.timestamp;
 }
 
 // export function handleOrderURIChanged(event: OrderURIChanged): void {
