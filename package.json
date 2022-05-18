@@ -5,7 +5,7 @@
     "codegen": "graph codegen",
     "build": "graph build",
     "deploy": "graph deploy --node https://api.studio.thegraph.com/deploy/ justin-test-rwtp",
-    "deploy-hosted": "graph deploy --node https://api.thegraph.com/deploy/ chitalian/real-world-trade-protocol-rinkeby",
+    "deploy-rinkeby-hosted": "graph deploy --node https://api.thegraph.com/deploy/ rwtp/rinkeby",
     "create-local": "graph create --node http://localhost:8020/ justin-test-rwtp",
     "remove-local": "graph remove --node http://localhost:8020/ justin-test-rwtp",
     "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 justin-test-rwtp"
