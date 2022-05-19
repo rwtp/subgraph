@@ -37,6 +37,8 @@ type SellOrder @entity {
   seller: Bytes!
   timeout: BigInt!
   createdAt: BigInt!
+  active: Boolean!
+  activeUpdatedAt: BigInt!
 }
 
 enum OfferState {
