@@ -58,6 +58,17 @@ function load_ipfs_meta_data(uri: string, sellOrder: SellOrder): SellOrder {
   );
   sellOrder.priceSuggested = getEntryString(typedMap, "priceSuggested");
   sellOrder.stakeSuggested = getEntryString(typedMap, "stakeSuggested");
+  let offerSchemaCid = getEntryString(typedMap, "offerSchema");
+  if (offerSchemaCid) {
+    let offerSchemaData = ipfs.cat(offerSchemaCid.replace("ipfs://", ""));
+    if (!offerSchemaData) {
+      sellOrder.error = `IPFS data not found for ${offerSchemaCid}`;
+      log.warning("Unable to get data at: {}", [offerSchemaCid]);
+    } else {
+      sellOrder.offerSchema = offerSchemaData.toString();
+      sellOrder.offerSchemaUri = offerSchemaCid;
+    }
+  }
   return sellOrder;
 }
 
