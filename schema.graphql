@@ -1,11 +1,11 @@
 type _Schema_
   @fulltext(
-    name: "sellOrderSearch"
+    name: "orderSearch"
     language: en
     algorithm: rank
     include: [
       {
-        entity: "SellOrder"
+        entity: "Order"
         fields: [{ name: "title" }, { name: "description" }]
       }
     ]
@@ -13,16 +13,15 @@ type _Schema_
 
 type OrderBook @entity {
   id: ID!
-  orders: [SellOrder!]!
+  orders: [Order!]!
   fee: BigInt!
   owner: Bytes!
 }
 
-type SellOrder @entity {
+type Order @entity {
   id: ID!
   address: Bytes!
   uri: String!
-  sellersStake: BigInt!
   title: String
   description: String
   primaryImage: String
@@ -34,7 +33,7 @@ type SellOrder @entity {
   offerCount: BigInt!
   token: Token
   tokenAddress: Bytes!
-  seller: Bytes!
+  maker: Bytes!
   timeout: BigInt!
   createdAt: BigInt!
   offerSchema: String
@@ -45,37 +44,33 @@ enum OfferState {
   Closed
   Open
   Committed
-  Confirmed
-  Canceled
-  Enforced
 }
 
 type OfferTransition @entity {
   id: ID!
   timestamp: BigInt!
   state: OfferState!
-  sellerCanceled: Boolean!
-  buyerCanceled: Boolean!
+  makerCanceled: Boolean!
+  takerCanceled: Boolean!
 }
 
 type Offer @entity {
   id: ID!
-  buyer: Bytes!
   index: BigInt!
-  quantity: BigInt!
-  pricePerUnit: BigInt!
-  stakePerUnit: BigInt!
+  taker: Bytes!
+  price: BigInt!
+  cost: BigInt!
+  stake: BigInt!
   uri: String!
   messagePublicKey: String!,
   messageNonce: String!,
   message: String!,
   timestamp: BigInt!
   state: OfferState!
-  sellOrder: SellOrder
-  seller: Bytes!
+  order: Order
   acceptedAt: BigInt!
-  sellerCanceled: Boolean!
-  buyerCanceled: Boolean!
+  makerCanceled: Boolean!
+  takerCanceled: Boolean!
   history: [OfferTransition!]!
 }
 

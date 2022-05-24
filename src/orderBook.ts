@@ -10,11 +10,11 @@ import {
 import {
   FeeChanged,
   OwnerChanged,
-  SellOrderCreated,
+  OrderCreated,
   OrderBook as OrderBookContract,
 } from "../generated/OrderBook/OrderBook";
-import { SellOrder, Token, OrderBook } from "../generated/schema";
-import { SellOrder as SellOrderContract } from "../generated/templates/SellOrder/SellOrder";
+import { Order, Token, OrderBook } from "../generated/schema";
+import { Order as OrderContract } from "../generated/templates/Order/Order";
 import { ERC20 } from "../generated/OrderBook/ERC20";
 
 import * as templates from "../generated/templates";
@@ -24,7 +24,7 @@ export function handleFeeChanged(event: FeeChanged): void {}
 
 export function handleOwnerChanged(event: OwnerChanged): void {}
 
-/// Mutates sellOrder by appending as much data as possible from the ipfs metadata.
+/// Mutates order by appending as much data as possible from the ipfs metadata.
 /// ipfs metadata format must be:
 /// {
 ///   "title": "title",
@@ -34,49 +34,49 @@ export function handleOwnerChanged(event: OwnerChanged): void {}
 ///   "priceSuggested": "0x000011",
 ///   "stakeSuggested": "0x024000",
 /// }
-function load_ipfs_meta_data(uri: string, sellOrder: SellOrder): SellOrder {
+function load_ipfs_meta_data(uri: string, order: Order): Order {
   const cid = uri.replace("ipfs://", "");
   let data = ipfs.cat(cid);
   if (!data) {
-    sellOrder.error = `IPFS data not found for ${cid}`;
+    order.error = `IPFS data not found for ${cid}`;
     log.warning("Unable to get data at: {}", [cid]);
-    return sellOrder;
+    return order;
   }
   const tryValue = json.try_fromBytes(data);
   const typedMap = tryValue.value.toObject();
   if (!typedMap) {
-    sellOrder.error = `invalid IPFS data for ${cid}`;
+    order.error = `invalid IPFS data for ${cid}`;
     log.warning("Unable to parse data at: {}", [cid]);
-    return sellOrder;
+    return order;
   }
-  sellOrder.title = getEntryString(typedMap, "title");
-  sellOrder.description = getEntryString(typedMap, "description");
-  sellOrder.primaryImage = getEntryString(typedMap, "primaryImage");
-  sellOrder.encryptionPublicKey = getEntryString(
+  order.title = getEntryString(typedMap, "title");
+  order.description = getEntryString(typedMap, "description");
+  order.primaryImage = getEntryString(typedMap, "primaryImage");
+  order.encryptionPublicKey = getEntryString(
     typedMap,
     "encryptionPublicKey"
   );
-  sellOrder.priceSuggested = getEntryString(typedMap, "priceSuggested");
-  sellOrder.stakeSuggested = getEntryString(typedMap, "stakeSuggested");
+  order.priceSuggested = getEntryString(typedMap, "priceSuggested");
+  order.stakeSuggested = getEntryString(typedMap, "stakeSuggested");
   let offerSchemaCid = getEntryString(typedMap, "offerSchema");
   if (offerSchemaCid) {
     let offerSchemaData = ipfs.cat(offerSchemaCid.replace("ipfs://", ""));
     if (!offerSchemaData) {
-      sellOrder.error = `IPFS data not found for ${offerSchemaCid}`;
+      order.error = `IPFS data not found for ${offerSchemaCid}`;
       log.warning("Unable to get data at: {}", [offerSchemaCid]);
     } else {
-      sellOrder.offerSchema = offerSchemaData.toString();
-      sellOrder.offerSchemaUri = offerSchemaCid;
+      order.offerSchema = offerSchemaData.toString();
+      order.offerSchemaUri = offerSchemaCid;
     }
   }
-  return sellOrder;
+  return order;
 }
 
 function load_erc20_data(
   tokenAddress: Address,
-  sellOrder: SellOrder
-): SellOrder {
-  sellOrder.tokenAddress = tokenAddress;
+  order: Order
+): Order {
+  order.tokenAddress = tokenAddress;
   let tokenEntity = Token.load(tokenAddress.toHex());
   if (!tokenEntity) {
     tokenEntity = new Token(tokenAddress.toHex());
@@ -84,55 +84,54 @@ function load_erc20_data(
   tokenEntity.address = tokenAddress;
   let tokenContract = ERC20.bind(tokenAddress);
   if (!tokenContract) {
-    sellOrder.error = `ERC20 contract not found for ${tokenAddress}`;
+    order.error = `ERC20 contract not found for ${tokenAddress}`;
     log.warning("Unable to get ERC20 contract at: {}", [tokenAddress.toHex()]);
-    return sellOrder;
+    return order;
   } else {
     tokenEntity.name = tokenContract.name();
     tokenEntity.symbol = tokenContract.symbol();
     tokenEntity.decimals = BigInt.fromI32(tokenContract.decimals());
     tokenEntity.totalSupply = tokenContract.totalSupply();
     tokenEntity.save();
-    sellOrder.token = tokenEntity.id;
+    order.token = tokenEntity.id;
   }
-  return sellOrder;
+  return order;
 }
 
 function create_sell_order(
-  sellOrderAddress: Address,
+  orderAddress: Address,
   timestamp: BigInt
-): SellOrder {
-  let sellOrderEntity = SellOrder.load(sellOrderAddress.toHex());
-  if (!sellOrderEntity) {
-    sellOrderEntity = new SellOrder(sellOrderAddress.toHex());
+): Order {
+  let orderEntity = Order.load(orderAddress.toHex());
+  if (!orderEntity) {
+    orderEntity = new Order(orderAddress.toHex());
   } else {
-    log.error("Sell order already exists: {}", [sellOrderAddress.toHex()]);
+    log.error("Sell order already exists: {}", [orderAddress.toHex()]);
     log.error(
-      "This should not be possible, overwriting existing sellOrder",
+      "This should not be possible, overwriting existing order",
       []
     );
   }
-  let sellOrderContract = SellOrderContract.bind(sellOrderAddress);
+  let orderContract = OrderContract.bind(orderAddress);
 
-  sellOrderEntity.createdAt = timestamp;
-  sellOrderEntity.address = sellOrderAddress;
-  sellOrderEntity.offers = [];
-  sellOrderEntity.offerCount = BigInt.fromI32(0);
-  sellOrderEntity = load_erc20_data(sellOrderContract.token(), sellOrderEntity);
-  sellOrderEntity.seller = sellOrderContract.seller();
-  sellOrderEntity.timeout = sellOrderContract.timeout();
-  sellOrderEntity.uri = sellOrderContract.orderURI();
-  sellOrderEntity.sellersStake = sellOrderContract.orderStake();
-  sellOrderEntity = load_ipfs_meta_data(sellOrderEntity.uri, sellOrderEntity);
-  sellOrderEntity.save();
-  return sellOrderEntity;
+  orderEntity.createdAt = timestamp;
+  orderEntity.address = orderAddress;
+  orderEntity.offers = [];
+  orderEntity.offerCount = BigInt.fromI32(0);
+  orderEntity = load_erc20_data(orderContract.token(), orderEntity);
+  orderEntity.maker = orderContract.maker();
+  orderEntity.timeout = orderContract.timeout();
+  orderEntity.uri = orderContract.orderURI();
+  orderEntity = load_ipfs_meta_data(orderEntity.uri, orderEntity);
+  orderEntity.save();
+  return orderEntity;
 }
 
-export function handleSellOrderCreated(event: SellOrderCreated): void {
-  let sellOrderAddress = event.params.sellOrder;
-  templates.SellOrder.create(sellOrderAddress);
-  let sellOrderEntity = create_sell_order(
-    sellOrderAddress,
+export function handleOrderCreated(event: OrderCreated): void {
+  let orderAddress = event.params.order;
+  templates.Order.create(orderAddress);
+  let orderEntity = create_sell_order(
+    orderAddress,
     event.block.timestamp
   );
   let orderBookAddress = event.address;
@@ -146,6 +145,6 @@ export function handleSellOrderCreated(event: SellOrderCreated): void {
   orderBookEntity.fee = orderBookContract.fee();
   orderBookEntity.owner = orderBookContract.owner();
 
-  orderBookEntity.orders = orderBookEntity.orders.concat([sellOrderEntity.id]);
+  orderBookEntity.orders = orderBookEntity.orders.concat([orderEntity.id]);
   orderBookEntity.save();
 }

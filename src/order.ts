@@ -10,20 +10,20 @@ import {
   OfferCanceled,
   OfferCommitted,
   OfferConfirmed,
-  OfferEnforced,
+  OfferRefunded,
   OfferWithdrawn,
-} from "../generated/templates/SellOrder/SellOrder";
-import { SellOrder as SellOrderContract } from "../generated/templates/SellOrder/SellOrder";
-import { Offer, SellOrder, OfferTransition } from "../generated/schema";
+} from "../generated/templates/Order/Order";
+import { Order as OrderContract } from "../generated/templates/Order/Order";
+import { Offer, Order, OfferTransition } from "../generated/schema";
 import { getEntryString } from "./entrySafeUnwrap";
 
 function getOffer(
-  buyer: Address,
+  taker: Address,
   index: BigInt,
-  sellOrderAddress: Address
+  orderAddress: Address
 ): Offer {
   const offerId =
-    buyer.toHex() + "-" + index.toString() + "-" + sellOrderAddress.toHex();
+    taker.toHex() + "-" + index.toString() + "-" + orderAddress.toHex();
   let entity = Offer.load(offerId);
   if (!entity) {
     entity = new Offer(offerId);
@@ -33,12 +33,12 @@ function getOffer(
 }
 
 function getOfferTransition(
-  buyer: Address,
+  taker: Address,
   index: BigInt,
   transaction_hash: string
 ): OfferTransition {
   const offerId =
-    buyer.toHex() + "-" + index.toString() + "-" + transaction_hash;
+    taker.toHex() + "-" + index.toString() + "-" + transaction_hash;
   let entity = OfferTransition.load(offerId);
   if (!entity) {
     entity = new OfferTransition(offerId);
@@ -53,50 +53,50 @@ const STATE_MAP = ["Closed", "Open", "Committed"];
 
 // Sorry this function is long I will clean up i promise :) 
 function updateOfferState(
-  sellOrderAddress: Address | null,
-  buyer: Address,
+  orderAddress: Address | null,
+  taker: Address,
   index: BigInt,
   timestamp: BigInt,
   transactionHash: string,
   event: string
 ): void {
-  if (sellOrderAddress === null) {
+  if (orderAddress === null) {
     log.error("Seller address is null", []);
     return;
   }
 
-  const offerEntity = getOffer(buyer, index, sellOrderAddress);
+  const offerEntity = getOffer(taker, index, orderAddress);
 
   log.info("updateOfferState: {} {} {} {} {}", [
-    sellOrderAddress.toHex(),
-    buyer.toHex(),
+    orderAddress.toHex(),
+    taker.toHex(),
     index.toString(),
     timestamp.toString(),
     transactionHash,
   ]);
 
 
-  let sellOrder = SellOrder.load(sellOrderAddress.toHex());
-  if (!sellOrder) {
+  let order = Order.load(orderAddress.toHex());
+  if (!order) {
     log.error("Sell order not found. This should be impossible", []);
     return;
   }
-  let sellOrderContract = SellOrderContract.bind(sellOrderAddress);
+  let orderContract = OrderContract.bind(orderAddress);
 
-  let tryOfferFromContract = sellOrderContract.try_offers(buyer, index);
+  let tryOfferFromContract = orderContract.try_offers(taker, index);
   if (tryOfferFromContract.reverted) {
     log.error("Offer not found. This should be impossible", []);
     return
   }
   let offerFromContract = tryOfferFromContract.value;
   const state = offerFromContract.value0;
-  const pricePerUnit = offerFromContract.value1;
-  const stakePerUnit = offerFromContract.value2;
-  const uri = offerFromContract.value3;
-  const acceptedAt = offerFromContract.value4;
-  const sellerCanceled = offerFromContract.value5;
-  const buyerCanceled = offerFromContract.value6;
-  const quantity = offerFromContract.value7;
+  const price: BigInt = offerFromContract.value1;
+  const cost: BigInt = offerFromContract.value2;
+  const stake: BigInt = offerFromContract.value3;
+  const uri: string = offerFromContract.value4;
+  const acceptedAt: BigInt = offerFromContract.value5;
+  const makerCanceled = offerFromContract.value6;
+  const takerCanceled = offerFromContract.value7;
 
 
   if (state > STATE_MAP.length) {
@@ -109,7 +109,7 @@ function updateOfferState(
   if (
     closed &&
     (event === "OfferCanceled") &&
-    sellerCanceled && buyerCanceled
+    makerCanceled && takerCanceled
   ) {
     newState = "Canceled";
   } else if (closed) {
@@ -128,58 +128,57 @@ function updateOfferState(
 
 
   offerEntity.state = newState;
-  offerEntity.seller = sellOrder.seller;
-  offerEntity.buyer = buyer;
+  offerEntity.taker = taker;
   offerEntity.index = index;
-  offerEntity.pricePerUnit = pricePerUnit;
-  offerEntity.quantity = quantity;
-  offerEntity.stakePerUnit = stakePerUnit;
+  offerEntity.price = price;
+  offerEntity.cost = cost;
+  offerEntity.stake = stake;
   offerEntity.uri = uri;
   offerEntity.timestamp = timestamp;
   offerEntity.acceptedAt = acceptedAt;
-  offerEntity.sellerCanceled = sellerCanceled;
-  offerEntity.buyerCanceled = buyerCanceled;
+  offerEntity.makerCanceled = makerCanceled;
+  offerEntity.takerCanceled = takerCanceled;
 
   // Get offer metadata from IPFS
   const cid = uri.replace("ipfs://", "");
   let data = ipfs.cat(cid);
   if (!data) {
-    sellOrder.error = `IPFS data not found for ${cid}`;
+    order.error = `IPFS data not found for ${cid}`;
     log.warning("Unable to get data at: {}", [cid]);
     return;
   }
   const tryValue = json.try_fromBytes(data);
   const typedMap = tryValue.value.toObject();
   if (!typedMap) {
-    sellOrder.error = `invalid IPFS data for ${cid}`;
+    order.error = `invalid IPFS data for ${cid}`;
     log.warning("Unable to parse data at: {}", [cid]);
     return;
   }
   log.info("Parsing data at {}", [cid]);
-  offerEntity.messagePublicKey = getEntryString(typedMap, "buyersPublicKey");
+  offerEntity.messagePublicKey = getEntryString(typedMap, "takersPublicKey");
   offerEntity.messageNonce = getEntryString(typedMap, "nonce");
   offerEntity.message = getEntryString(typedMap, "message");
 
-  let offerTransition = getOfferTransition(buyer, index, transactionHash);
-  offerTransition.buyerCanceled = buyerCanceled;
-  offerTransition.sellerCanceled = sellerCanceled;
+  let offerTransition = getOfferTransition(taker, index, transactionHash);
+  offerTransition.takerCanceled = takerCanceled;
+  offerTransition.makerCanceled = makerCanceled;
   offerTransition.state = newState;
   offerTransition.timestamp = timestamp;
   offerTransition.save();
   offerEntity.history = offerEntity.history.concat([offerTransition.id]);
-  offerEntity.sellOrder = sellOrder.id;
+  offerEntity.order = order.id;
   offerEntity.save();
-  if (!sellOrder.offers.includes(offerEntity.id)) {
-    sellOrder.offers = sellOrder.offers.concat([offerEntity.id]);
-    sellOrder.offerCount = BigInt.fromI64(sellOrder.offers.length);
-    sellOrder.save();
+  if (!order.offers.includes(offerEntity.id)) {
+    order.offers = order.offers.concat([offerEntity.id]);
+    order.offerCount = BigInt.fromI64(order.offers.length);
+    order.save();
   }
 }
 
 export function handleOfferCanceled(event: OfferCanceled): void {
   updateOfferState(
     event.transaction.to,
-    event.params.buyer,
+    event.params.taker,
     event.params.index,
     event.block.timestamp,
     event.transaction.hash.toHex(),
@@ -189,7 +188,7 @@ export function handleOfferCanceled(event: OfferCanceled): void {
 export function handleOfferCommitted(event: OfferCommitted): void {
   updateOfferState(
     event.transaction.to,
-    event.params.buyer,
+    event.params.taker,
     event.params.index,
     event.block.timestamp,
     event.transaction.hash.toHex(),
@@ -199,27 +198,27 @@ export function handleOfferCommitted(event: OfferCommitted): void {
 export function handleOfferConfirmed(event: OfferConfirmed): void {
   updateOfferState(
     event.transaction.to,
-    event.params.buyer,
+    event.params.taker,
     event.params.index,
     event.block.timestamp,
     event.transaction.hash.toHex(),
     "OfferConfirmed"
   );
 }
-export function handleOfferEnforced(event: OfferEnforced): void {
+export function handleOfferRefunded(event: OfferRefunded): void {
   updateOfferState(
     event.transaction.to,
-    event.params.buyer,
+    event.params.taker,
     event.params.index,
     event.block.timestamp,
     event.transaction.hash.toHex(),
-    "OfferEnforced"
+    "OfferRefunded"
   );
 }
 export function handleOfferWithdrawn(event: OfferWithdrawn): void {
   updateOfferState(
     event.transaction.to,
-    event.params.buyer,
+    event.params.taker,
     event.params.index,
     event.block.timestamp,
     event.transaction.hash.toHex(),
@@ -230,7 +229,7 @@ export function handleOfferWithdrawn(event: OfferWithdrawn): void {
 export function handleOfferSubmitted(event: OfferSubmitted): void {
   updateOfferState(
     event.transaction.to,
-    event.params.buyer,
+    event.params.taker,
     event.params.index,
     event.block.timestamp,
     event.transaction.hash.toHex(),
