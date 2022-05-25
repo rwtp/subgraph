@@ -14,8 +14,9 @@ import {
   OfferWithdrawn,
 } from "../generated/templates/Order/Order";
 import { Order as OrderContract } from "../generated/templates/Order/Order";
-import { Offer, Order, OfferTransition } from "../generated/schema";
+import { Offer, Order, OfferTransition, Token } from "../generated/schema";
 import { getEntryString } from "./entrySafeUnwrap";
+import { ERC20 } from "../generated/OrderBook/ERC20";
 
 function getOffer(
   taker: Address,
@@ -65,7 +66,7 @@ function updateOfferState(
     return;
   }
 
-  const offerEntity = getOffer(taker, index, orderAddress);
+  let offerEntity = getOffer(taker, index, orderAddress);
 
   log.info("updateOfferState: {} {} {} {} {}", [
     orderAddress.toHex(),
@@ -90,14 +91,15 @@ function updateOfferState(
   }
   let offerFromContract = tryOfferFromContract.value;
   const state = offerFromContract.value0;
-  const price: BigInt = offerFromContract.value1;
-  const buyersCost: BigInt = offerFromContract.value2;
-  const sellersStake: BigInt = offerFromContract.value3;
-  const timeout: BigInt = offerFromContract.value4;
-  const uri: string = offerFromContract.value5;
-  const acceptedAt: BigInt = offerFromContract.value6;
-  const makerCanceled = offerFromContract.value7;
-  const takerCanceled = offerFromContract.value8;
+  const tokenAddress: Address = offerFromContract.value1;
+  const price: BigInt = offerFromContract.value2;
+  const buyersCost: BigInt = offerFromContract.value3;
+  const sellersStake: BigInt = offerFromContract.value4;
+  const timeout: BigInt = offerFromContract.value5;
+  const uri: string = offerFromContract.value6;
+  const acceptedAt: BigInt = offerFromContract.value7;
+  const makerCanceled = offerFromContract.value8;
+  const takerCanceled = offerFromContract.value9;
 
 
   if (state > STATE_MAP.length) {
@@ -131,6 +133,8 @@ function updateOfferState(
   offerEntity.state = newState;
   offerEntity.taker = taker;
   offerEntity.index = index;
+  offerEntity.tokenAddress = tokenAddress;
+  offerEntity = load_erc20_data(tokenAddress, offerEntity);
   offerEntity.price = price;
   offerEntity.buyersCost = buyersCost;
   offerEntity.sellersStake = sellersStake;
@@ -237,6 +241,32 @@ export function handleOfferSubmitted(event: OfferSubmitted): void {
     event.transaction.hash.toHex(),
     "OfferSubmitted"
   );
+}
+
+
+function load_erc20_data(
+  tokenAddress: Address,
+  offer: Offer
+): Offer {
+  offer.tokenAddress = tokenAddress;
+  let tokenEntity = Token.load(tokenAddress.toHex());
+  if (!tokenEntity) {
+    tokenEntity = new Token(tokenAddress.toHex());
+  }
+  tokenEntity.address = tokenAddress;
+  let tokenContract = ERC20.bind(tokenAddress);
+  if (!tokenContract) {
+    log.warning("Unable to get ERC20 contract at: {}", [tokenAddress.toHex()]);
+    return offer;
+  } else {
+    tokenEntity.name = tokenContract.name();
+    tokenEntity.symbol = tokenContract.symbol();
+    tokenEntity.decimals = BigInt.fromI32(tokenContract.decimals());
+    tokenEntity.totalSupply = tokenContract.totalSupply();
+    tokenEntity.save();
+    offer.token = tokenEntity.id;
+  }
+  return offer;
 }
 
 // export function handleOrderURIChanged(event: OrderURIChanged): void {

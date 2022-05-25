@@ -26,13 +26,14 @@ type Order @entity {
   description: String
   primaryImage: String
   encryptionPublicKey: String
+  tokenAddressSuggested: [String!]
   priceSuggested: String
-  stakeSuggested: String
+  sellersStakeSuggested: String
+  buyersCostSuggested: String
+  suggestedTimeout: String
   error: String
   offers: [Offer!]!
   offerCount: BigInt!
-  token: Token
-  tokenAddress: Bytes!
   maker: Bytes!
   createdAt: BigInt!
   offerSchema: String
@@ -57,6 +58,8 @@ type Offer @entity {
   id: ID!
   index: BigInt!
   taker: Bytes!
+  tokenAddress: Bytes!
+  token: Token
   price: BigInt!
   buyersCost: BigInt!
   sellersStake: BigInt!

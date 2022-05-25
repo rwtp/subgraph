@@ -1,8 +1,6 @@
 import {
   ipfs,
   json,
-  TypedMap,
-  JSONValue,
   log,
   BigInt,
   Address,
@@ -13,12 +11,11 @@ import {
   OrderCreated,
   OrderBook as OrderBookContract,
 } from "../generated/OrderBook/OrderBook";
-import { Order, Token, OrderBook } from "../generated/schema";
+import { Order, OrderBook } from "../generated/schema";
 import { Order as OrderContract } from "../generated/templates/Order/Order";
-import { ERC20 } from "../generated/OrderBook/ERC20";
 
 import * as templates from "../generated/templates";
-import { getEntryString } from "./entrySafeUnwrap";
+import { getEntryArrayStrings, getEntryString } from "./entrySafeUnwrap";
 
 export function handleFeeChanged(event: FeeChanged): void {}
 
@@ -31,8 +28,11 @@ export function handleOwnerChanged(event: OwnerChanged): void {}
 ///   "description": "description",
 ///   "primaryImage": "ipfs://image/url",
 ///   "encryptionPublicKey": "encryptionPublicKey",
+///   "tokenAddressSuggested": ["tokenAddress"],
 ///   "priceSuggested": "0x000011",
-///   "stakeSuggested": "0x024000",
+///   "sellersStakeSuggested": "0x024000",
+///   "buyersCostSuggested": "0x024000",
+///   "suggestedTimeout": "0x024000",
 /// }
 function load_ipfs_meta_data(uri: string, order: Order): Order {
   const cid = uri.replace("ipfs://", "");
@@ -56,8 +56,11 @@ function load_ipfs_meta_data(uri: string, order: Order): Order {
     typedMap,
     "encryptionPublicKey"
   );
-  order.priceSuggested = getEntryString(typedMap, "priceSuggested");
-  order.stakeSuggested = getEntryString(typedMap, "stakeSuggested");
+  order.tokenAddressSuggested =  getEntryArrayStrings(typedMap, "tokenAddressSuggested");
+  order.priceSuggested =  getEntryString(typedMap, "priceSuggested");
+  order.sellersStakeSuggested =  getEntryString(typedMap, "sellersStakeSuggested");
+  order.buyersCostSuggested =  getEntryString(typedMap, "buyersCostSuggested");
+  order.suggestedTimeout =  getEntryString(typedMap, "suggestedTimeout");
   let offerSchemaCid = getEntryString(typedMap, "offerSchema");
   if (offerSchemaCid) {
     let offerSchemaData = ipfs.cat(offerSchemaCid.replace("ipfs://", ""));
@@ -68,32 +71,6 @@ function load_ipfs_meta_data(uri: string, order: Order): Order {
       order.offerSchema = offerSchemaData.toString();
       order.offerSchemaUri = offerSchemaCid;
     }
-  }
-  return order;
-}
-
-function load_erc20_data(
-  tokenAddress: Address,
-  order: Order
-): Order {
-  order.tokenAddress = tokenAddress;
-  let tokenEntity = Token.load(tokenAddress.toHex());
-  if (!tokenEntity) {
-    tokenEntity = new Token(tokenAddress.toHex());
-  }
-  tokenEntity.address = tokenAddress;
-  let tokenContract = ERC20.bind(tokenAddress);
-  if (!tokenContract) {
-    order.error = `ERC20 contract not found for ${tokenAddress}`;
-    log.warning("Unable to get ERC20 contract at: {}", [tokenAddress.toHex()]);
-    return order;
-  } else {
-    tokenEntity.name = tokenContract.name();
-    tokenEntity.symbol = tokenContract.symbol();
-    tokenEntity.decimals = BigInt.fromI32(tokenContract.decimals());
-    tokenEntity.totalSupply = tokenContract.totalSupply();
-    tokenEntity.save();
-    order.token = tokenEntity.id;
   }
   return order;
 }
@@ -118,7 +95,6 @@ function create_sell_order(
   orderEntity.address = orderAddress;
   orderEntity.offers = [];
   orderEntity.offerCount = BigInt.fromI32(0);
-  orderEntity = load_erc20_data(orderContract.token(), orderEntity);
   orderEntity.maker = orderContract.maker();
   orderEntity.uri = orderContract.orderURI();
   orderEntity = load_ipfs_meta_data(orderEntity.uri, orderEntity);
