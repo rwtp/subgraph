@@ -28,7 +28,7 @@ export function handleOwnerChanged(event: OwnerChanged): void {}
 ///   "description": "description",
 ///   "primaryImage": "ipfs://image/url",
 ///   "encryptionPublicKey": "encryptionPublicKey",
-///   "tokenAddressSuggested": ["tokenAddress"],
+///   "tokenAddressesSuggested": ["tokenAddress"],
 ///   "priceSuggested": "0x000011",
 ///   "sellersStakeSuggested": "0x024000",
 ///   "buyersCostSuggested": "0x024000",
@@ -56,7 +56,7 @@ function load_ipfs_meta_data(uri: string, order: Order): Order {
     typedMap,
     "encryptionPublicKey"
   );
-  order.tokenAddressSuggested =  getEntryArrayStrings(typedMap, "tokenAddressSuggested");
+  order.tokenAddressesSuggested =  getEntryArrayStrings(typedMap, "tokenAddressesSuggested");
   order.priceSuggested =  getEntryString(typedMap, "priceSuggested");
   order.sellersStakeSuggested =  getEntryString(typedMap, "sellersStakeSuggested");
   order.buyersCostSuggested =  getEntryString(typedMap, "buyersCostSuggested");
