@@ -23,7 +23,7 @@ dataSources:
         - name: Order
           file: ./node_modules/rwtp/out/Order.sol/Order.json
         - name: ERC20
-          file: ./abis/erc20.json
+          file: node_modules/rwtp/out/ERC20.sol/ERC20.json
       eventHandlers:
         - event: FeeChanged(uint256,uint256)
           handler: handleFeeChanged
@@ -49,6 +49,8 @@ templates:
       abis:
         - name: Order
           file: ./node_modules/rwtp/out/Order.sol/Order.json
+        - name: ERC20
+          file: node_modules/rwtp/out/ERC20.sol/ERC20.json
       eventHandlers:
         - event: OfferSubmitted(indexed address,indexed uint128,address,uint128,uint128,uint128,uint128,string)
           handler: handleOfferSubmitted

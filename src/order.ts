@@ -161,7 +161,7 @@ function updateOfferState(
     return;
   }
   log.info("Parsing data at {}", [cid]);
-  offerEntity.messagePublicKey = getEntryString(typedMap, "takersPublicKey");
+  offerEntity.messagePublicKey = getEntryString(typedMap, "publicKey");
   offerEntity.messageNonce = getEntryString(typedMap, "nonce");
   offerEntity.message = getEntryString(typedMap, "message");
 
