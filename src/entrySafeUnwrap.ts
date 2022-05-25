@@ -12,15 +12,15 @@ export function getEntryString(
   return "";
 }
 
-export function getEntryArrayStrings(
+export function getEntryArrayBytes(
   typedMap: TypedMap<string, JSONValue>,
   key: string
-): Array<string> {
+): Array<Bytes> {
   const entry = typedMap.getEntry(key);
   if (entry && entry.value.kind == JSONValueKind.ARRAY) {
     let array = entry.value.toArray();
-    return array.map<string>((e) => e.toString());
+    return array.map<Bytes>((e) => Bytes.fromHexString(e.toString()));
   }
   log.warning("Unable to parse string at: {}", [key]);
-  return [""];
+  return [];
 }

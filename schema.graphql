@@ -26,7 +26,8 @@ type Order @entity {
   description: String
   primaryImage: String
   encryptionPublicKey: String
-  tokenAddressesSuggested: [String!]
+  tokenAddressesSuggested: [Bytes!]
+  tokensSuggested: [Token!]
   priceSuggested: String
   sellersStakeSuggested: String
   buyersCostSuggested: String

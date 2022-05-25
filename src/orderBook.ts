@@ -4,6 +4,7 @@ import {
   log,
   BigInt,
   Address,
+  Bytes,
 } from "@graphprotocol/graph-ts";
 import {
   FeeChanged,
@@ -11,11 +12,12 @@ import {
   OrderCreated,
   OrderBook as OrderBookContract,
 } from "../generated/OrderBook/OrderBook";
-import { Order, OrderBook } from "../generated/schema";
+import { Order, OrderBook, Token } from "../generated/schema";
 import { Order as OrderContract } from "../generated/templates/Order/Order";
 
 import * as templates from "../generated/templates";
-import { getEntryArrayStrings, getEntryString } from "./entrySafeUnwrap";
+import { getEntryArrayBytes, getEntryString } from "./entrySafeUnwrap";
+import { ERC20 } from "../generated/OrderBook/ERC20";
 
 export function handleFeeChanged(event: FeeChanged): void {}
 
@@ -56,7 +58,10 @@ function load_ipfs_meta_data(uri: string, order: Order): Order {
     typedMap,
     "encryptionPublicKey"
   );
-  order.tokenAddressesSuggested =  getEntryArrayStrings(typedMap, "tokenAddressesSuggested");
+  order.tokenAddressesSuggested =  getEntryArrayBytes(typedMap, "tokenAddressesSuggested");
+  if (order.tokenAddressesSuggested) {
+    order.tokensSuggested =  getEntryArrayTokens(order.tokenAddressesSuggested!);
+  }
   order.priceSuggested =  getEntryString(typedMap, "priceSuggested");
   order.sellersStakeSuggested =  getEntryString(typedMap, "sellersStakeSuggested");
   order.buyersCostSuggested =  getEntryString(typedMap, "buyersCostSuggested");
@@ -122,4 +127,31 @@ export function handleOrderCreated(event: OrderCreated): void {
 
   orderBookEntity.orders = orderBookEntity.orders.concat([orderEntity.id]);
   orderBookEntity.save();
+}
+
+function getEntryArrayTokens(
+  tokenAddresses: Bytes[]
+): string[] {
+  let tokenEntityIds: string[] = [];
+  for (let i = 0; i < tokenAddresses.length; i++) { 
+    const tokenAddress = tokenAddresses[i];
+    let tokenEntity = Token.load(tokenAddress.toHex());
+    if (!tokenEntity) {
+      tokenEntity = new Token(tokenAddress.toHex());
+    }
+    tokenEntity.address = tokenAddress;
+    let tokenContract = ERC20.bind(Address.fromBytes(tokenAddress));
+    if (!tokenContract) {
+      log.warning("Unable to get ERC20 contract at: {}", [tokenAddress.toHex()]);
+      break;
+    } else {
+      tokenEntity.name = tokenContract.name();
+      tokenEntity.symbol = tokenContract.symbol();
+      tokenEntity.decimals = BigInt.fromI32(tokenContract.decimals());
+      tokenEntity.totalSupply = tokenContract.totalSupply();
+      tokenEntity.save();
+      tokenEntityIds.push(tokenEntity.id);
+    }
+  }
+  return tokenEntityIds;
 }
