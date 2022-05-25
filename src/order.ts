@@ -91,12 +91,13 @@ function updateOfferState(
   let offerFromContract = tryOfferFromContract.value;
   const state = offerFromContract.value0;
   const price: BigInt = offerFromContract.value1;
-  const cost: BigInt = offerFromContract.value2;
-  const stake: BigInt = offerFromContract.value3;
-  const uri: string = offerFromContract.value4;
-  const acceptedAt: BigInt = offerFromContract.value5;
-  const makerCanceled = offerFromContract.value6;
-  const takerCanceled = offerFromContract.value7;
+  const buyersCost: BigInt = offerFromContract.value2;
+  const sellersStake: BigInt = offerFromContract.value3;
+  const timeout: BigInt = offerFromContract.value4;
+  const uri: string = offerFromContract.value5;
+  const acceptedAt: BigInt = offerFromContract.value6;
+  const makerCanceled = offerFromContract.value7;
+  const takerCanceled = offerFromContract.value8;
 
 
   if (state > STATE_MAP.length) {
@@ -131,8 +132,9 @@ function updateOfferState(
   offerEntity.taker = taker;
   offerEntity.index = index;
   offerEntity.price = price;
-  offerEntity.cost = cost;
-  offerEntity.stake = stake;
+  offerEntity.buyersCost = buyersCost;
+  offerEntity.sellersStake = sellersStake;
+  offerEntity.timeout = timeout;
   offerEntity.uri = uri;
   offerEntity.timestamp = timestamp;
   offerEntity.acceptedAt = acceptedAt;

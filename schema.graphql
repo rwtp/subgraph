@@ -34,7 +34,6 @@ type Order @entity {
   token: Token
   tokenAddress: Bytes!
   maker: Bytes!
-  timeout: BigInt!
   createdAt: BigInt!
   offerSchema: String
   offerSchemaUri: String
@@ -59,8 +58,9 @@ type Offer @entity {
   index: BigInt!
   taker: Bytes!
   price: BigInt!
-  cost: BigInt!
-  stake: BigInt!
+  buyersCost: BigInt!
+  sellersStake: BigInt!
+  timeout: BigInt!
   uri: String!
   messagePublicKey: String!,
   messageNonce: String!,

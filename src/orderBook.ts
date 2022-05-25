@@ -120,7 +120,6 @@ function create_sell_order(
   orderEntity.offerCount = BigInt.fromI32(0);
   orderEntity = load_erc20_data(orderContract.token(), orderEntity);
   orderEntity.maker = orderContract.maker();
-  orderEntity.timeout = orderContract.timeout();
   orderEntity.uri = orderContract.orderURI();
   orderEntity = load_ipfs_meta_data(orderEntity.uri, orderEntity);
   orderEntity.save();

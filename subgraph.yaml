@@ -6,7 +6,7 @@ dataSources:
     name: OrderBook
     network: rinkeby
     source:
-      address: "0x25842Ed11FAE58Fc909E2716D951A1Dc2EC2a05f"
+      address: "0x898435D69C5184D4E3A9cca571D9Dd688074ffCF"
       abi: OrderBook
       startBlock: 10733452
     mapping:
@@ -50,7 +50,7 @@ templates:
         - name: Order
           file: ./node_modules/rwtp/out/Order.sol/Order.json
       eventHandlers:
-        - event: OfferSubmitted(indexed address,indexed uint32,uint128,uint128,uint128,string)
+        - event: OfferSubmitted(indexed address,indexed uint32,uint128,uint128,uint128,uint128,string)
           handler: handleOfferSubmitted
         - event: OrderURIChanged(string,string)
           handler: handleOrderURIChanged
