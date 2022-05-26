@@ -6,7 +6,7 @@ dataSources:
     name: OrderBook
     network: rinkeby
     source:
-      address: "0x8587256edf3d11ebf70540180140132c6d36bd29"
+      address: "0xbd2e1dbe56053ee310249ce5969208ad7aa72dd0"
       abi: OrderBook
       startBlock: 10738878
     mapping:
