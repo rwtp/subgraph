@@ -45,6 +45,9 @@ enum OfferState {
   Closed
   Open
   Committed
+  Confirmed
+  Withdrawn
+  Refunded
 }
 
 type OfferTransition @entity {

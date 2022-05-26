@@ -4,6 +4,7 @@ import {
   BigInt,
   ipfs,
   json,
+  store
 } from "@graphprotocol/graph-ts";
 import {
   OfferSubmitted,
@@ -18,13 +19,15 @@ import { Offer, Order, OfferTransition, Token } from "../generated/schema";
 import { getEntryString } from "./entrySafeUnwrap";
 import { ERC20 } from "../generated/OrderBook/ERC20";
 
+// TODO: Add in timestamp or something incase the same person orders the same thing twice
 function getOffer(
   taker: Address,
   index: BigInt,
-  orderAddress: Address
+  orderAddress: Address,
+  closedAt: BigInt
 ): Offer {
   const offerId =
-    taker.toHex() + "-" + index.toString() + "-" + orderAddress.toHex();
+    `${taker.toHex()}-${index.toString()}-${orderAddress.toHex()}-${closedAt.toString()}`;
   let entity = Offer.load(offerId);
   if (!entity) {
     entity = new Offer(offerId);
@@ -51,6 +54,15 @@ function getOfferTransition(
 
 const STATE_MAP = ["Closed", "Open", "Committed"];
 
+enum Event {
+  OfferSubmitted,
+  OfferCanceled,
+  OfferCommitted,
+  OfferConfirmed,
+  OfferRefunded,
+  OfferWithdrawn,
+}
+
 
 // Sorry this function is long I will clean up i promise :) 
 function updateOfferState(
@@ -59,24 +71,14 @@ function updateOfferState(
   index: BigInt,
   timestamp: BigInt,
   transactionHash: string,
-  event: string
+  event: Event
 ): void {
   if (orderAddress === null) {
     log.error("Seller address is null", []);
     return;
   }
 
-  let offerEntity = getOffer(taker, index, orderAddress);
-
-  log.info("updateOfferState: {} {} {} {} {}", [
-    orderAddress.toHex(),
-    taker.toHex(),
-    index.toString(),
-    timestamp.toString(),
-    transactionHash,
-  ]);
-
-
+  // Load order entity
   let order = Order.load(orderAddress.toHex());
   if (!order) {
     log.error("Sell order not found. This should be impossible", []);
@@ -84,6 +86,7 @@ function updateOfferState(
   }
   let orderContract = OrderContract.bind(orderAddress);
 
+  // Load on chain offer state
   let tryOfferFromContract = orderContract.try_offers(taker, index);
   if (tryOfferFromContract.reverted) {
     log.error("Offer not found. This should be impossible", []);
@@ -102,35 +105,65 @@ function updateOfferState(
   const takerCanceled = offerFromContract.value9;
 
 
-  if (state > STATE_MAP.length) {
+  if (state >= STATE_MAP.length) {
     log.error("Invalid state: {}", [state.toString()]);
     return;
   }
 
-  let newState = "";
-  let closed = STATE_MAP[state] === "Closed";
-  if (
-    closed &&
-    (event === "OfferCanceled") &&
-    makerCanceled && takerCanceled
-  ) {
-    newState = "Canceled";
-  } else if (closed) {
-    if (event === "OfferEnforced") {
-      newState = "Enforced";
-    } else if (event === "OfferWithdrawn") {
-      newState = "Withdrawn";
-    } else if (event === "OfferConfirmed") {
-      newState = "Confirmed";
-    } else if (event === "OfferEnforced") {
-      newState = "Enforced";
+  log.info("updateOfferState: {} {} {} {} {} {}", [
+    orderAddress.toHex(),
+    taker.toHex(),
+    index.toString(),
+    timestamp.toString(),
+    transactionHash,
+    event.toString()
+  ]);
+
+  let offerEntity: Offer;
+  if (STATE_MAP[state] == "Closed") {
+    // Create new closed offer with state and remove old offer
+    offerEntity = getOffer(taker, index, orderAddress, timestamp);
+    const oldOfferEntity = getOffer(taker, index, orderAddress, BigInt.fromI32(0));
+    switch (event) {
+      case Event.OfferConfirmed:
+        offerEntity.state = "Confirmed";
+        break;
+      case Event.OfferRefunded:
+        offerEntity.state = "Refunded";
+        break;
+      case Event.OfferWithdrawn:
+        offerEntity.state = "Withdrawn";
+        break;
+      default:
+        offerEntity.state = "Closed";
+        break;
     }
+    offerEntity.taker = oldOfferEntity.taker;
+    offerEntity.index = oldOfferEntity.index;
+    offerEntity.tokenAddress = oldOfferEntity.tokenAddress;
+    offerEntity.token = oldOfferEntity.token
+    offerEntity.price = oldOfferEntity.price;
+    offerEntity.buyersCost = oldOfferEntity.buyersCost;
+    offerEntity.sellersStake = oldOfferEntity.sellersStake;
+    offerEntity.timeout = oldOfferEntity.timeout;
+    offerEntity.uri = oldOfferEntity.uri;
+    offerEntity.timestamp = oldOfferEntity.timestamp;
+    offerEntity.acceptedAt = oldOfferEntity.acceptedAt;
+    offerEntity.makerCanceled = oldOfferEntity.makerCanceled;
+    offerEntity.takerCanceled = oldOfferEntity.takerCanceled;
+    offerEntity.messagePublicKey = oldOfferEntity.messagePublicKey;
+    offerEntity.messageNonce = oldOfferEntity.messageNonce;
+    offerEntity.message = oldOfferEntity.message;
+    offerEntity.order = oldOfferEntity.order;
+    offerEntity.save()
+    // Delete the old offer
+    store.remove("Offer", oldOfferEntity.id);
+    return;
   } else {
-    newState = STATE_MAP[state];
+    offerEntity = getOffer(taker, index, orderAddress, BigInt.fromI32(0));
   }
 
-
-  offerEntity.state = newState;
+  offerEntity.state = STATE_MAP[state];
   offerEntity.taker = taker;
   offerEntity.index = index;
   offerEntity.tokenAddress = tokenAddress;
@@ -165,13 +198,13 @@ function updateOfferState(
   offerEntity.messageNonce = getEntryString(typedMap, "nonce");
   offerEntity.message = getEntryString(typedMap, "message");
 
-  let offerTransition = getOfferTransition(taker, index, transactionHash);
-  offerTransition.takerCanceled = takerCanceled;
-  offerTransition.makerCanceled = makerCanceled;
-  offerTransition.state = newState;
-  offerTransition.timestamp = timestamp;
-  offerTransition.save();
-  offerEntity.history = offerEntity.history.concat([offerTransition.id]);
+  // let offerTransition = getOfferTransition(taker, index, transactionHash);
+  // offerTransition.takerCanceled = takerCanceled;
+  // offerTransition.makerCanceled = makerCanceled;
+  // offerTransition.state = STATE_MAP[state];
+  // offerTransition.timestamp = timestamp;
+  // offerTransition.save();
+  // offerEntity.history = offerEntity.history.concat([offerTransition.id]);
   offerEntity.order = order.id;
   offerEntity.save();
   if (!order.offers.includes(offerEntity.id)) {
@@ -188,7 +221,7 @@ export function handleOfferCanceled(event: OfferCanceled): void {
     event.params.index,
     event.block.timestamp,
     event.transaction.hash.toHex(),
-    "OfferCanceled"
+    Event.OfferCanceled
   );
 }
 export function handleOfferCommitted(event: OfferCommitted): void {
@@ -198,7 +231,7 @@ export function handleOfferCommitted(event: OfferCommitted): void {
     event.params.index,
     event.block.timestamp,
     event.transaction.hash.toHex(),
-    "OfferCommitted"
+    Event.OfferCommitted
   );
 }
 export function handleOfferConfirmed(event: OfferConfirmed): void {
@@ -208,7 +241,7 @@ export function handleOfferConfirmed(event: OfferConfirmed): void {
     event.params.index,
     event.block.timestamp,
     event.transaction.hash.toHex(),
-    "OfferConfirmed"
+    Event.OfferConfirmed
   );
 }
 export function handleOfferRefunded(event: OfferRefunded): void {
@@ -218,7 +251,7 @@ export function handleOfferRefunded(event: OfferRefunded): void {
     event.params.index,
     event.block.timestamp,
     event.transaction.hash.toHex(),
-    "OfferRefunded"
+    Event.OfferRefunded
   );
 }
 export function handleOfferWithdrawn(event: OfferWithdrawn): void {
@@ -228,7 +261,7 @@ export function handleOfferWithdrawn(event: OfferWithdrawn): void {
     event.params.index,
     event.block.timestamp,
     event.transaction.hash.toHex(),
-    "OfferWithdrawn"
+    Event.OfferWithdrawn
   );
 }
 
@@ -239,7 +272,7 @@ export function handleOfferSubmitted(event: OfferSubmitted): void {
     event.params.index,
     event.block.timestamp,
     event.transaction.hash.toHex(),
-    "OfferSubmitted"
+    Event.OfferSubmitted
   );
 }
 
