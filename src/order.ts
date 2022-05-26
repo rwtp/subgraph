@@ -154,49 +154,44 @@ function updateOfferState(
     offerEntity.messagePublicKey = oldOfferEntity.messagePublicKey;
     offerEntity.messageNonce = oldOfferEntity.messageNonce;
     offerEntity.message = oldOfferEntity.message;
-    offerEntity.order = oldOfferEntity.order;
-    offerEntity.save()
     // Delete the old offer
     store.remove("Offer", oldOfferEntity.id);
-    return;
   } else {
     offerEntity = getOffer(taker, index, orderAddress, BigInt.fromI32(0));
+    offerEntity.state = STATE_MAP[state];
+    offerEntity.taker = taker;
+    offerEntity.index = index;
+    offerEntity.tokenAddress = tokenAddress;
+    offerEntity = load_erc20_data(tokenAddress, offerEntity);
+    offerEntity.price = price;
+    offerEntity.buyersCost = buyersCost;
+    offerEntity.sellersStake = sellersStake;
+    offerEntity.timeout = timeout;
+    offerEntity.uri = uri;
+    offerEntity.timestamp = timestamp;
+    offerEntity.acceptedAt = acceptedAt;
+    offerEntity.makerCanceled = makerCanceled;
+    offerEntity.takerCanceled = takerCanceled;
+    // Get offer metadata from IPFS
+    const cid = uri.replace("ipfs://", "");
+    let data = ipfs.cat(cid);
+    if (!data) {
+      order.error = `IPFS data not found for ${cid}`;
+      log.warning("Unable to get data at: {}", [cid]);
+      return;
+    }
+    const tryValue = json.try_fromBytes(data);
+    const typedMap = tryValue.value.toObject();
+    if (!typedMap) {
+      order.error = `invalid IPFS data for ${cid}`;
+      log.warning("Unable to parse data at: {}", [cid]);
+      return;
+    }
+    log.info("Parsing data at {}", [cid]);
+    offerEntity.messagePublicKey = getEntryString(typedMap, "publicKey");
+    offerEntity.messageNonce = getEntryString(typedMap, "nonce");
+    offerEntity.message = getEntryString(typedMap, "message");
   }
-
-  offerEntity.state = STATE_MAP[state];
-  offerEntity.taker = taker;
-  offerEntity.index = index;
-  offerEntity.tokenAddress = tokenAddress;
-  offerEntity = load_erc20_data(tokenAddress, offerEntity);
-  offerEntity.price = price;
-  offerEntity.buyersCost = buyersCost;
-  offerEntity.sellersStake = sellersStake;
-  offerEntity.timeout = timeout;
-  offerEntity.uri = uri;
-  offerEntity.timestamp = timestamp;
-  offerEntity.acceptedAt = acceptedAt;
-  offerEntity.makerCanceled = makerCanceled;
-  offerEntity.takerCanceled = takerCanceled;
-
-  // Get offer metadata from IPFS
-  const cid = uri.replace("ipfs://", "");
-  let data = ipfs.cat(cid);
-  if (!data) {
-    order.error = `IPFS data not found for ${cid}`;
-    log.warning("Unable to get data at: {}", [cid]);
-    return;
-  }
-  const tryValue = json.try_fromBytes(data);
-  const typedMap = tryValue.value.toObject();
-  if (!typedMap) {
-    order.error = `invalid IPFS data for ${cid}`;
-    log.warning("Unable to parse data at: {}", [cid]);
-    return;
-  }
-  log.info("Parsing data at {}", [cid]);
-  offerEntity.messagePublicKey = getEntryString(typedMap, "publicKey");
-  offerEntity.messageNonce = getEntryString(typedMap, "nonce");
-  offerEntity.message = getEntryString(typedMap, "message");
 
   // let offerTransition = getOfferTransition(taker, index, transactionHash);
   // offerTransition.takerCanceled = takerCanceled;
