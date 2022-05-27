@@ -10,21 +10,12 @@ processes = []
   image="graphprotocol/graph-node:latest"
 
 [env]
-postgres_host="subgraph-pg.internal"
-postgres_port=5432
-postgres_user="rwtp"
-postgres_password="rwtp"
-postgres_db="rwtp"
-ipfs="rwtp-ipfs.internal:5001"
-ethereum="rinkeby:https://rinkeby.infura.io/v3/ea07de956656482f818e0af2d688726d"
-
-[[services]]
-  internal_port = 8020
-  protocol = "tcp"
-  
-  [[services.ports]]
-    port = "8020"
-
+  postgres_host="subgraph-pg.internal"
+  postgres_port=5432
+  postgres_user="app"
+  postgres_db="rinkeby"
+  ipfs="rwtp-ipfs.internal:5001"
+  ethereum="rinkeby:https://rinkeby.infura.io/v3/ea07de956656482f818e0af2d688726d"
 
 [[services]]
   internal_port = 8080
@@ -36,17 +27,6 @@ ethereum="rinkeby:https://rinkeby.infura.io/v3/ea07de956656482f818e0af2d688726d"
   [[services.ports]]
     handlers = ["tls", "http"]
     port = "443"
-
-# [[services]]
-#   internal_port = 8001
-#   protocol = "tcp"
-  
-#   [[services.ports]]
-#     port = "8001"
-
-#   [[services.ports]]
-#     handlers = ["tls", "http"]
-#     port = "443"
 
 [[services]]
   internal_port = 8020
