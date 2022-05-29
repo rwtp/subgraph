@@ -1,3 +1,16 @@
+type _Schema_
+  @fulltext(
+    name: "orderSearch"
+    language: en
+    algorithm: rank
+    include: [
+      {
+        entity: "Order"
+        fields: [{ name: "title" }, { name: "description" }]
+      }
+    ]
+  )
+
 type OrderBook @entity {
   id: ID!
   orders: [Order!]!
@@ -9,11 +22,23 @@ type Order @entity {
   id: ID!
   address: Bytes!
   uri: String!
+  title: String
+  description: String
+  primaryImage: String
+  encryptionPublicKey: String
+  tokenAddressesSuggested: [Bytes!]
+  tokensSuggested: [Token!]
+  priceSuggested: String
+  sellersStakeSuggested: String
+  buyersCostSuggested: String
+  suggestedTimeout: String
   error: String
   offers: [Offer!]!
   offerCount: BigInt!
   maker: Bytes!
   createdAt: BigInt!
+  offerSchema: String
+  offerSchemaUri: String
 }
 
 enum OfferState {
@@ -44,6 +69,9 @@ type Offer @entity {
   sellersStake: BigInt!
   timeout: BigInt!
   uri: String!
+  messagePublicKey: String!,
+  messageNonce: String!,
+  message: String!,
   timestamp: BigInt!
   state: OfferState!
   order: Order

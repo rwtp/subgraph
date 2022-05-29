@@ -158,8 +158,9 @@ function updateOfferState(
     store.remove("Offer", oldOfferEntity.id);
   } else {
     offerEntity = getOffer(taker, index, orderAddress, BigInt.fromI32(0));
-    offerEntity.index = index;
+    offerEntity.state = STATE_MAP[state];
     offerEntity.taker = taker;
+    offerEntity.index = index;
     offerEntity.tokenAddress = tokenAddress;
     offerEntity = load_erc20_data(tokenAddress, offerEntity);
     offerEntity.price = price;
@@ -167,20 +168,38 @@ function updateOfferState(
     offerEntity.sellersStake = sellersStake;
     offerEntity.timeout = timeout;
     offerEntity.uri = uri;
-    offerEntity.state = STATE_MAP[state];
     offerEntity.timestamp = timestamp;
     offerEntity.acceptedAt = acceptedAt;
     offerEntity.makerCanceled = makerCanceled;
     offerEntity.takerCanceled = takerCanceled;
+    // Get offer metadata from IPFS
+    const cid = uri.replace("ipfs://", "");
+    let data = ipfs.cat(cid);
+    if (!data) {
+      order.error = `IPFS data not found for ${cid}`;
+      log.warning("Unable to get data at: {}", [cid]);
+      return;
+    }
+    const tryValue = json.try_fromBytes(data);
+    const typedMap = tryValue.value.toObject();
+    if (!typedMap) {
+      order.error = `invalid IPFS data for ${cid}`;
+      log.warning("Unable to parse data at: {}", [cid]);
+      return;
+    }
+    log.info("Parsing data at {}", [cid]);
+    offerEntity.messagePublicKey = getEntryString(typedMap, "publicKey");
+    offerEntity.messageNonce = getEntryString(typedMap, "nonce");
+    offerEntity.message = getEntryString(typedMap, "message");
   }
 
-  let offerTransition = getOfferTransition(taker, index, transactionHash);
-  offerTransition.takerCanceled = takerCanceled;
-  offerTransition.makerCanceled = makerCanceled;
-  offerTransition.state = STATE_MAP[state];
-  offerTransition.timestamp = timestamp;
-  offerTransition.save();
-  offerEntity.history = offerEntity.history.concat([offerTransition.id]);
+  // let offerTransition = getOfferTransition(taker, index, transactionHash);
+  // offerTransition.takerCanceled = takerCanceled;
+  // offerTransition.makerCanceled = makerCanceled;
+  // offerTransition.state = STATE_MAP[state];
+  // offerTransition.timestamp = timestamp;
+  // offerTransition.save();
+  // offerEntity.history = offerEntity.history.concat([offerTransition.id]);
   offerEntity.order = order.id;
   offerEntity.save();
   if (!order.offers.includes(offerEntity.id)) {
