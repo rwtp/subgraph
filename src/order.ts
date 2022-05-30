@@ -203,7 +203,7 @@ function updateOfferState(
 
   if (offerEntity.contractState === "Closed") {
     store.remove('Offer', offerEntity.id);
-    offerEntity.id = offerEntity.id + '-closed';
+    offerEntity.id = offerEntity.id + `-closed-${transactionHash}`;
   }
 
 
