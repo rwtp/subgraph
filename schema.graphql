@@ -49,6 +49,11 @@ enum OfferState {
   Withdrawn
   Refunded
 }
+enum OfferContactState {
+  Closed
+  Open
+  Committed
+}
 
 type OfferTransition @entity {
   id: ID!
@@ -74,6 +79,7 @@ type Offer @entity {
   message: String!,
   timestamp: BigInt!
   state: OfferState!
+  contractState: OfferContactState!
   order: Order
   acceptedAt: BigInt!
   makerCanceled: Boolean!

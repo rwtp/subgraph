@@ -23,11 +23,10 @@ import { ERC20 } from "../generated/OrderBook/ERC20";
 function getOffer(
   taker: Address,
   index: BigInt,
-  orderAddress: Address,
-  closedAt: BigInt
+  orderAddress: Address
 ): Offer {
   const offerId =
-    `${taker.toHex()}-${index.toString()}-${orderAddress.toHex()}-${closedAt.toString()}`;
+    `${taker.toHex()}-${index.toString()}-${orderAddress.toHex()}`;
   let entity = Offer.load(offerId);
   if (!entity) {
     entity = new Offer(offerId);
@@ -63,8 +62,120 @@ enum Event {
   OfferWithdrawn,
 }
 
+function getOfferState(
+  event: Event,
+  state: i32,
+): string {
+  switch (event) {
+    case Event.OfferConfirmed:
+      return "Confirmed";
+    case Event.OfferRefunded:
+      return "Refunded";
+    case Event.OfferWithdrawn:
+      return "Withdrawn";
+    default:
+      return STATE_MAP[state];
+  }
+}
 
-// Sorry this function is long I will clean up i promise :) 
+function loadOfferDataFromContract(
+  orderAddress: Address,
+  offerEntity: Offer,
+  taker: Address,
+  index: BigInt,
+  event: Event,
+): Offer | null {
+  let orderContract = OrderContract.bind(orderAddress);
+
+  // Load on chain offer state
+  let tryOfferFromContract = orderContract.try_offers(taker, index);
+  if (tryOfferFromContract.reverted) {
+    log.error("Offer not found. This should be impossible", []);
+    return null;
+  }
+  let offerFromContract = tryOfferFromContract.value;
+  const state = offerFromContract.value0;
+  const tokenAddress: Address = offerFromContract.value1;
+  const price: BigInt = offerFromContract.value2;
+  const buyersCost: BigInt = offerFromContract.value3;
+  const sellersStake: BigInt = offerFromContract.value4;
+  const timeout: BigInt = offerFromContract.value5;
+  const uri: string = offerFromContract.value6;
+  const acceptedAt: BigInt = offerFromContract.value7;
+  const makerCanceled = offerFromContract.value8;
+  const takerCanceled = offerFromContract.value9;
+  if (state >= STATE_MAP.length) {
+    log.error("Invalid state: {}", [state.toString()]);
+    return null;
+  }
+  offerEntity.state = getOfferState(event, state);
+  offerEntity.contractState = STATE_MAP[state];
+  if (offerEntity.contractState !== "Closed") {
+    offerEntity.tokenAddress = tokenAddress;
+    offerEntity = load_erc20_data(tokenAddress, offerEntity);
+    offerEntity.taker = taker;
+    offerEntity.index = index;
+    offerEntity.price = price;
+    offerEntity.buyersCost = buyersCost;
+    offerEntity.sellersStake = sellersStake;
+    offerEntity.timeout = timeout;
+    offerEntity.uri = uri;
+    offerEntity.acceptedAt = acceptedAt;
+    offerEntity.makerCanceled = makerCanceled;
+    offerEntity.takerCanceled = takerCanceled;
+  }
+  return offerEntity;
+}
+
+function loadOfferIPFSData(offerEntity: Offer): Offer | null {
+  const cid = offerEntity.uri.replace("ipfs://", "");
+  let data = ipfs.cat(cid);
+  if (!data) {
+    log.warning("Unable to get data at: {}", [cid]);
+    return null;
+  }
+  const tryValue = json.try_fromBytes(data);
+  const typedMap = tryValue.value.toObject();
+  if (!typedMap) {
+    log.warning("Unable to parse data at: {}", [cid]);
+    return null;
+  }
+  log.info("Parsing data at {}", [cid]);
+  offerEntity.messagePublicKey = getEntryString(typedMap, "publicKey");
+  offerEntity.messageNonce = getEntryString(typedMap, "nonce");
+  offerEntity.message = getEntryString(typedMap, "message");
+  return offerEntity;
+}
+
+function loadTransitionData(
+  offerTransition: OfferTransition,
+  offerEntity: Offer,
+  timestamp: BigInt,
+): OfferTransition {
+  offerTransition.takerCanceled = offerEntity.takerCanceled;
+  offerTransition.makerCanceled = offerEntity.makerCanceled;
+  offerTransition.state = offerEntity.state;
+  offerTransition.timestamp = timestamp;
+  return offerTransition;
+}
+
+function loadAllOfferData(
+  orderAddress: Address,
+  offerEntity: Offer,
+  taker: Address,
+  index: BigInt,
+  event: Event,
+  timestamp: BigInt,
+): Offer | null {
+  offerEntity.timestamp = timestamp;
+  let offer = loadOfferDataFromContract(orderAddress, offerEntity, taker, index, event);
+  if (!offer) {
+    return null;
+  }
+  offer = loadOfferIPFSData(offer);
+  return offer;
+}
+
 function updateOfferState(
   orderAddress: Address | null,
   taker: Address,
@@ -84,122 +195,22 @@ function updateOfferState(
     log.error("Sell order not found. This should be impossible", []);
     return;
   }
-  let orderContract = OrderContract.bind(orderAddress);
-
-  // Load on chain offer state
-  let tryOfferFromContract = orderContract.try_offers(taker, index);
-  if (tryOfferFromContract.reverted) {
-    log.error("Offer not found. This should be impossible", []);
-    return
-  }
-  let offerFromContract = tryOfferFromContract.value;
-  const state = offerFromContract.value0;
-  const tokenAddress: Address = offerFromContract.value1;
-  const price: BigInt = offerFromContract.value2;
-  const buyersCost: BigInt = offerFromContract.value3;
-  const sellersStake: BigInt = offerFromContract.value4;
-  const timeout: BigInt = offerFromContract.value5;
-  const uri: string = offerFromContract.value6;
-  const acceptedAt: BigInt = offerFromContract.value7;
-  const makerCanceled = offerFromContract.value8;
-  const takerCanceled = offerFromContract.value9;
-
-
-  if (state >= STATE_MAP.length) {
-    log.error("Invalid state: {}", [state.toString()]);
+  let offer = getOffer(taker, index, orderAddress);
+  let offerEntity = loadAllOfferData(orderAddress, offer, taker, index, event, timestamp);
+  if (!offerEntity) {
     return;
   }
 
-  log.info("updateOfferState: {} {} {} {} {} {}", [
-    orderAddress.toHex(),
-    taker.toHex(),
-    index.toString(),
-    timestamp.toString(),
-    transactionHash,
-    event.toString()
-  ]);
-
-  let offerEntity: Offer;
-  if (STATE_MAP[state] == "Closed") {
-    // Create new closed offer with state and remove old offer
-    offerEntity = getOffer(taker, index, orderAddress, timestamp);
-    const oldOfferEntity = getOffer(taker, index, orderAddress, BigInt.fromI32(0));
-    switch (event) {
-      case Event.OfferConfirmed:
-        offerEntity.state = "Confirmed";
-        break;
-      case Event.OfferRefunded:
-        offerEntity.state = "Refunded";
-        break;
-      case Event.OfferWithdrawn:
-        offerEntity.state = "Withdrawn";
-        break;
-      default:
-        offerEntity.state = "Closed";
-        break;
-    }
-    offerEntity.taker = oldOfferEntity.taker;
-    offerEntity.index = oldOfferEntity.index;
-    offerEntity.tokenAddress = oldOfferEntity.tokenAddress;
-    offerEntity.token = oldOfferEntity.token
-    offerEntity.price = oldOfferEntity.price;
-    offerEntity.buyersCost = oldOfferEntity.buyersCost;
-    offerEntity.sellersStake = oldOfferEntity.sellersStake;
-    offerEntity.timeout = oldOfferEntity.timeout;
-    offerEntity.uri = oldOfferEntity.uri;
-    offerEntity.timestamp = oldOfferEntity.timestamp;
-    offerEntity.acceptedAt = oldOfferEntity.acceptedAt;
-    offerEntity.makerCanceled = oldOfferEntity.makerCanceled;
-    offerEntity.takerCanceled = oldOfferEntity.takerCanceled;
-    offerEntity.messagePublicKey = oldOfferEntity.messagePublicKey;
-    offerEntity.messageNonce = oldOfferEntity.messageNonce;
-    offerEntity.message = oldOfferEntity.message;
-    // Delete the old offer
-    store.remove("Offer", oldOfferEntity.id);
-  } else {
-    offerEntity = getOffer(taker, index, orderAddress, BigInt.fromI32(0));
-    offerEntity.state = STATE_MAP[state];
-    offerEntity.taker = taker;
-    offerEntity.index = index;
-    offerEntity.tokenAddress = tokenAddress;
-    offerEntity = load_erc20_data(tokenAddress, offerEntity);
-    offerEntity.price = price;
-    offerEntity.buyersCost = buyersCost;
-    offerEntity.sellersStake = sellersStake;
-    offerEntity.timeout = timeout;
-    offerEntity.uri = uri;
-    offerEntity.timestamp = timestamp;
-    offerEntity.acceptedAt = acceptedAt;
-    offerEntity.makerCanceled = makerCanceled;
-    offerEntity.takerCanceled = takerCanceled;
-    // Get offer metadata from IPFS
-    const cid = uri.replace("ipfs://", "");
-    let data = ipfs.cat(cid);
-    if (!data) {
-      order.error = `IPFS data not found for ${cid}`;
-      log.warning("Unable to get data at: {}", [cid]);
-      return;
-    }
-    const tryValue = json.try_fromBytes(data);
-    const typedMap = tryValue.value.toObject();
-    if (!typedMap) {
-      order.error = `invalid IPFS data for ${cid}`;
-      log.warning("Unable to parse data at: {}", [cid]);
-      return;
-    }
-    log.info("Parsing data at {}", [cid]);
-    offerEntity.messagePublicKey = getEntryString(typedMap, "publicKey");
-    offerEntity.messageNonce = getEntryString(typedMap, "nonce");
-    offerEntity.message = getEntryString(typedMap, "message");
+  if (offerEntity.contractState === "Closed") {
+    store.remove('Offer', offerEntity.id);
+    offerEntity.id = offerEntity.id + `-closed-${transactionHash}`;
   }
 
-  // let offerTransition = getOfferTransition(taker, index, transactionHash);
-  // offerTransition.takerCanceled = takerCanceled;
-  // offerTransition.makerCanceled = makerCanceled;
-  // offerTransition.state = STATE_MAP[state];
-  // offerTransition.timestamp = timestamp;
-  // offerTransition.save();
-  // offerEntity.history = offerEntity.history.concat([offerTransition.id]);
+
+  let offerTransition = getOfferTransition(taker, index, transactionHash);
+  offerTransition = loadTransitionData(offerTransition, offerEntity, timestamp);
+  offerTransition.save();
+  offerEntity.history = offerEntity.history.concat([offerTransition.id]);
   offerEntity.order = order.id;
   offerEntity.save();
   if (!order.offers.includes(offerEntity.id)) {
@@ -287,10 +298,34 @@ function load_erc20_data(
     log.warning("Unable to get ERC20 contract at: {}", [tokenAddress.toHex()]);
     return offer;
   } else {
-    tokenEntity.name = tokenContract.name();
-    tokenEntity.symbol = tokenContract.symbol();
-    tokenEntity.decimals = BigInt.fromI32(tokenContract.decimals());
-    tokenEntity.totalSupply = tokenContract.totalSupply();
+    let name = tokenContract.try_name();
+    if (name.reverted) {
+      log.warning("Unable to get ERC20 name at: {}", [tokenAddress.toHex()]);
+      return offer;
+    } else {
+      tokenEntity.name = name.value;
+    }
+    let symbol = tokenContract.try_symbol();
+    if (symbol.reverted) {
+      log.warning("Unable to get ERC20 symbol at: {}", [tokenAddress.toHex()]);
+      return offer;
+    } else {
+      tokenEntity.symbol = symbol.value;
+    }
+    let decimals = tokenContract.try_decimals();
+    if (decimals.reverted) {
+      log.warning("Unable to get ERC20 decimals at: {}", [tokenAddress.toHex()]);
+      return offer;
+    } else {
+      tokenEntity.decimals = BigInt.fromI32(decimals.value);
+    }
+    let totalSupply = tokenContract.try_totalSupply();
+    if (totalSupply.reverted) {
+      log.warning("Unable to get ERC20 totalSupply at: {}", [tokenAddress.toHex()]);
+      return offer;
+    } else {
+      tokenEntity.totalSupply = totalSupply.value;
+    }
     tokenEntity.save();
     offer.token = tokenEntity.id;
   }
