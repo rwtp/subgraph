@@ -80,6 +80,7 @@ function load_ipfs_meta_data(uri: string, order: Order): Order {
   return order;
 }
 
+const ORDER_TYPE_MAP = ["SellOrder", "BuyOrder"];
 function create_sell_order(
   orderAddress: Address,
   timestamp: BigInt
@@ -95,7 +96,12 @@ function create_sell_order(
     );
   }
   let orderContract = OrderContract.bind(orderAddress);
-
+  
+  if (orderContract.orderType() >= ORDER_TYPE_MAP.length) {
+    log.error("Invalid order type: {}", [orderContract.orderType().toString()]);
+    return orderEntity;
+  }
+  orderEntity.orderType = ORDER_TYPE_MAP[orderContract.orderType()];
   orderEntity.createdAt = timestamp;
   orderEntity.address = orderAddress;
   orderEntity.offers = [];

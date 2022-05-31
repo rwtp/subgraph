@@ -20,6 +20,7 @@ type OrderBook @entity {
 
 type Order @entity {
   id: ID!
+  orderType: OrderType!
   address: Bytes!
   uri: String!
   title: String
@@ -38,7 +39,7 @@ type Order @entity {
   maker: Bytes!
   createdAt: BigInt!
   offerSchema: String
-  offerSchemaUri: String
+  offerSchemaUri: String 
 }
 
 enum OfferState {
@@ -53,6 +54,11 @@ enum OfferContactState {
   Closed
   Open
   Committed
+}
+
+enum OrderType {
+  SellOrder
+  BuyOrder
 }
 
 type OfferTransition @entity {
