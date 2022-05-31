@@ -4,11 +4,11 @@ schema:
 dataSources:
   - kind: ethereum
     name: OrderBook
-    network: rinkeby
+    network: kovan
     source:
       address: "0xbd2e1dbe56053ee310249ce5969208ad7aa72dd0"
       abi: OrderBook
-      startBlock: 10738878
+      startBlock: 31831656
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.5
@@ -36,7 +36,7 @@ dataSources:
 templates:
   - name: Order
     kind: ethereum/contract
-    network: rinkeby
+    network: kovan
     source:
       abi: Order
     mapping:
