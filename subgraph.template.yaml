@@ -1,0 +1,66 @@
+specVersion: 0.0.2
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: OrderBook
+    network: {{network}}
+    source:
+      address: "0xbd2e1dbe56053ee310249ce5969208ad7aa72dd0"
+      abi: OrderBook
+      startBlock: {{starting_block}}
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.5
+      language: wasm/assemblyscript
+      entities:
+        - FeeChanged
+        - OwnerChanged
+        - OrderCreated
+      abis:
+        - name: OrderBook
+          file: ./node_modules/rwtp/out/OrderBook.sol/OrderBook.json
+        - name: Order
+          file: ./node_modules/rwtp/out/Order.sol/Order.json
+        - name: ERC20
+          file: node_modules/rwtp/out/ERC20.sol/ERC20.json
+      eventHandlers:
+        - event: FeeChanged(uint256,uint256)
+          handler: handleFeeChanged
+        - event: OwnerChanged(address,address)
+          handler: handleOwnerChanged
+        - event: OrderCreated(indexed address)
+          handler: handleOrderCreated
+      file: ./src/orderBook.ts
+
+templates:
+  - name: Order
+    kind: ethereum/contract
+    network: {{network}}
+    source:
+      abi: Order
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.5
+      language: wasm/assemblyscript
+      file: ./src/order.ts
+      entities:
+        - OfferSubmitted
+      abis:
+        - name: Order
+          file: ./node_modules/rwtp/out/Order.sol/Order.json
+        - name: ERC20
+          file: node_modules/rwtp/out/ERC20.sol/ERC20.json
+      eventHandlers:
+        - event: OfferSubmitted(indexed address,indexed uint128,address,uint128,uint128,uint128,uint128,string)
+          handler: handleOfferSubmitted
+        - event: OrderURIChanged(string,string)
+          handler: handleOrderURIChanged
+        - event: OfferWithdrawn(indexed address,indexed uint128)
+          handler: handleOfferWithdrawn
+        - event: OfferCommitted(indexed address,indexed uint128)
+          handler: handleOfferCommitted
+        - event: OfferConfirmed(indexed address,indexed uint128)
+          handler: handleOfferConfirmed
+        - event: OfferRefunded(indexed address,indexed uint128)
+          handler: handleOfferRefunded

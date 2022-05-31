@@ -4,15 +4,23 @@
   "scripts": {
     "codegen": "graph codegen",
     "build": "graph build",
-    "deploy": "graph deploy --node https://api.studio.thegraph.com/deploy/ justin-test-rwtp",
+    "deploy-studio": "graph deploy --node https://api.studio.thegraph.com/deploy/ justin-test-rwtp",
     "deploy-rinkeby-hosted": "graph deploy --node https://api.thegraph.com/deploy/ rwtp/rinkeby",
-    "create-local": "graph create --node http://localhost:8020/ justin-test-rwtp",
-    "remove-local": "graph remove --node http://localhost:8020/ justin-test-rwtp",
-    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 justin-test-rwtp"
+    "deploy-optimism-hosted": "graph deploy --node https://api.thegraph.com/deploy/ rwtp/optimism",
+    "prepare:optimism": "mustache config/optimism.json subgraph.template.yaml > subgraph.yaml",
+    "prepare:rinkeby": "mustache config/rinkeby.json subgraph.template.yaml > subgraph.yaml",
+    "deploy-all": "yarn prepare:optimism && yarn deploy-optimism-hosted && yarn prepare:rinkeby && yarn deploy-rinkeby-hosted",
+    "create-local": "graph create --node http://localhost:8020/ rwtp",
+    "remove-local": "graph remove --node http://localhost:8020/ rwtp",
+    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 rwtp"
   },
   "dependencies": {
     "@graphprotocol/graph-cli": "0.29.2",
     "@graphprotocol/graph-ts": "0.26.0",
     "rwtp": "^0.10.5"
+  },
+  "devDependencies": {
+    "matchstick-as": "^0.5.0",
+    "mustache": "^3.1.0"
   }
 }
