@@ -212,6 +212,7 @@ function updateOfferState(
   offerTransition.save();
   offerEntity.history = offerEntity.history.concat([offerTransition.id]);
   offerEntity.order = order.id;
+  offerEntity.maker = order.maker;
   offerEntity.save();
   if (!order.offers.includes(offerEntity.id)) {
     order.offers = order.offers.concat([offerEntity.id]);

@@ -73,6 +73,7 @@ type Offer @entity {
   id: ID!
   index: BigInt!
   taker: Bytes!
+  maker: Bytes!
   tokenAddress: Bytes!
   token: Token
   price: BigInt!
