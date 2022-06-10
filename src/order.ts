@@ -222,6 +222,9 @@ function updateOfferState(
 }
 
 export function handleOfferCanceled(event: OfferCanceled): void {
+  if (event.params.takerCanceled) {
+    return;
+  }
   updateOfferState(
     event.transaction.to,
     event.params.taker,
