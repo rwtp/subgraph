@@ -49,6 +49,7 @@ enum OfferState {
   Confirmed
   Withdrawn
   Refunded
+  Canceled
 }
 enum OfferContactState {
   Closed
@@ -81,9 +82,9 @@ type Offer @entity {
   sellersStake: BigInt!
   timeout: BigInt!
   uri: String!
-  messagePublicKey: String!,
-  messageNonce: String!,
-  message: String!,
+  messagePublicKey: String,
+  messageNonce: String,
+  message: String,
   timestamp: BigInt!
   state: OfferState!
   contractState: OfferContactState!

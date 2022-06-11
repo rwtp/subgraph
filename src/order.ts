@@ -36,12 +36,10 @@ function getOffer(
 }
 
 function getOfferTransition(
-  taker: Address,
-  index: BigInt,
-  transaction_hash: string
+  offerBuilder: OfferBuilder
 ): OfferTransition {
   const offerId =
-    taker.toHex() + "-" + index.toString() + "-" + transaction_hash;
+  offerBuilder.taker.toHex() + "-" + offerBuilder.index.toString() + "-" + offerBuilder.transactionHash;
   let entity = OfferTransition.load(offerId);
   if (!entity) {
     entity = new OfferTransition(offerId);
@@ -81,14 +79,12 @@ function getOfferState(
 function loadOfferDataFromContract(
   orderAddress: Address,
   offerEntity: Offer,
-  taker: Address,
-  index: BigInt,
-  event: Event,
+  offerBuilder: OfferBuilder
 ): Offer | null {
   let orderContract = OrderContract.bind(orderAddress);
 
   // Load on chain offer state
-  let tryOfferFromContract = orderContract.try_offers(taker, index);
+  let tryOfferFromContract = orderContract.try_offers(offerBuilder.taker, offerBuilder.index);
   if (tryOfferFromContract.reverted) {
     log.error("Offer not found. This should be impossible", []);
     return null;
@@ -108,13 +104,13 @@ function loadOfferDataFromContract(
     log.error("Invalid state: {}", [state.toString()]);
     return null;
   }
-  offerEntity.state = getOfferState(event, state);
+  offerEntity.state = getOfferState(offerBuilder.event, state);
   offerEntity.contractState = STATE_MAP[state];
   if (offerEntity.contractState !== "Closed") {
     offerEntity.tokenAddress = tokenAddress;
     offerEntity = load_erc20_data(tokenAddress, offerEntity);
-    offerEntity.taker = taker;
-    offerEntity.index = index;
+    offerEntity.taker = offerBuilder.taker;
+    offerEntity.index = offerBuilder.index;
     offerEntity.price = price;
     offerEntity.buyersCost = buyersCost;
     offerEntity.sellersStake = sellersStake;
@@ -162,13 +158,10 @@ function loadTransitionData(
 function loadAllOfferData(
   orderAddress: Address,
   offerEntity: Offer,
-  taker: Address,
-  index: BigInt,
-  event: Event,
-  timestamp: BigInt,
+  offerBuilder: OfferBuilder
 ): Offer | null {
-  offerEntity.timestamp = timestamp;
-  let offer = loadOfferDataFromContract(orderAddress, offerEntity, taker, index, event);
+  offerEntity.timestamp = offerBuilder.timestamp;
+  let offer = loadOfferDataFromContract(orderAddress, offerEntity, offerBuilder);
   if (!offer) {
     return null;
   }
@@ -176,114 +169,170 @@ function loadAllOfferData(
   return offer;
 }
 
-function updateOfferState(
-  orderAddress: Address | null,
-  taker: Address,
-  index: BigInt,
-  timestamp: BigInt,
-  transactionHash: string,
-  event: Event
-): void {
+function getOrder(orderAddress: Address | null) : Order | null {
   if (orderAddress === null) {
     log.error("Seller address is null", []);
-    return;
+    return null;
   }
 
   // Load order entity
-  let order = Order.load(orderAddress.toHex());
+  return Order.load(orderAddress.toHex());
+
+}
+class offerStates {
+  constructor(
+    public offer: Offer,
+    public offerTransition: OfferTransition,
+    public order: Order,
+  ) {}
+  
+}
+class OfferBuilder {
+  constructor(
+    public orderAddress: Address | null,
+    public taker: Address,
+    public index: BigInt,
+    public timestamp: BigInt,
+    public transactionHash: string,
+    public event: Event,
+  ) {}
+}
+function buildOfferStates(
+  offerBuilder: OfferBuilder
+): offerStates | null {
+  let order = getOrder(offerBuilder.orderAddress);
   if (!order) {
     log.error("Sell order not found. This should be impossible", []);
-    return;
+    return null ;
   }
-  let offer = getOffer(taker, index, orderAddress);
-  let offerEntity = loadAllOfferData(orderAddress, offer, taker, index, event, timestamp);
+  let offer = getOffer(offerBuilder.taker, offerBuilder.index, Address.fromBytes(order.address));
+  let offerEntity = loadAllOfferData(Address.fromBytes(order.address), offer, offerBuilder);
   if (!offerEntity) {
-    return;
+    return null;
   }
 
-  if (offerEntity.contractState === "Closed") {
-    store.remove('Offer', offerEntity.id);
-    offerEntity.id = offerEntity.id + `-closed-${transactionHash}`;
-  }
-
-
-  let offerTransition = getOfferTransition(taker, index, transactionHash);
-  offerTransition = loadTransitionData(offerTransition, offerEntity, timestamp);
-  offerTransition.save();
+  let offerTransition = getOfferTransition(offerBuilder);
+  offerTransition = loadTransitionData(offerTransition, offerEntity, offerBuilder.timestamp);
   offerEntity.history = offerEntity.history.concat([offerTransition.id]);
   offerEntity.order = order.id;
   offerEntity.maker = order.maker;
-  offerEntity.save();
   if (!order.offers.includes(offerEntity.id)) {
     order.offers = order.offers.concat([offerEntity.id]);
     order.offerCount = BigInt.fromI64(order.offers.length);
-    order.save();
   }
+  return new offerStates(
+    offer,
+    offerTransition,
+    order,
+  );
 }
 
-export function handleOfferCanceled(event: OfferCanceled): void {
-  if (event.params.takerCanceled) {
+function updateOfferState(
+  offerBuilder: OfferBuilder
+): void {
+  const offerStates = buildOfferStates(offerBuilder);
+  if (!offerStates) {
     return;
   }
-  updateOfferState(
+  
+
+  if (offerStates.offer.contractState === "Closed") {
+    store.remove('Offer', offerStates.offer.id);
+    offerStates.offer.id = offerStates.offer.id + `-closed-${offerBuilder.transactionHash}`;
+  }
+
+  offerStates.offerTransition.save();
+  offerStates.offer.save();
+  offerStates.offer.save();
+}
+
+
+
+export function handleOfferCanceled(event: OfferCanceled): void {
+  const offerBuilder = new OfferBuilder (
     event.transaction.to,
     event.params.taker,
     event.params.index,
     event.block.timestamp,
     event.transaction.hash.toHex(),
-    Event.OfferCanceled
+    Event.OfferCanceled,
   );
+  const offerStates = buildOfferStates(offerBuilder);
+  if (!offerStates) {
+    return;
+  }
+
+  if (event.params.makerCanceled === false && event.params.takerCanceled === false) {
+    offerStates.offer.takerCanceled = true;
+    offerStates.offer.makerCanceled = true;
+    offerStates.offer.state = "Canceled";
+    store.remove('Offer', offerStates.offer.id);
+    offerStates.offer.id = offerStates.offer.id + `-closed-${offerBuilder.transactionHash}`;
+  } else if (offerStates.offer.contractState === "Closed") {
+    // Handles a strange edge case where both the maker and taker cancel on the same block.
+    // Causing one but not both to be true and the state to be closed.
+    // We are able to take advantage of the fact that you can only ever set cancel and not unset.
+    // If we implement un-setting cancel, we will need to reevaluate this function. Probably to
+    // just ensure that either takerCanceled or makerCanceled is set.
+    offerStates.offer.contractState = "Committed";
+    offerStates.offer.state = "Committed";
+  }
+  
+  offerStates.offerTransition.save();
+  offerStates.offer.save();
+  offerStates.offer.save();
+
 }
 export function handleOfferCommitted(event: OfferCommitted): void {
-  updateOfferState(
+  updateOfferState(new OfferBuilder(
     event.transaction.to,
     event.params.taker,
     event.params.index,
     event.block.timestamp,
     event.transaction.hash.toHex(),
-    Event.OfferCommitted
-  );
+    Event.OfferCommitted,
+  ));
 }
 export function handleOfferConfirmed(event: OfferConfirmed): void {
-  updateOfferState(
+  updateOfferState(new OfferBuilder(
     event.transaction.to,
     event.params.taker,
     event.params.index,
     event.block.timestamp,
     event.transaction.hash.toHex(),
-    Event.OfferConfirmed
-  );
+    Event.OfferConfirmed,
+  ));
 }
 export function handleOfferRefunded(event: OfferRefunded): void {
-  updateOfferState(
+  updateOfferState(new OfferBuilder(
     event.transaction.to,
     event.params.taker,
     event.params.index,
     event.block.timestamp,
     event.transaction.hash.toHex(),
-    Event.OfferRefunded
-  );
+    Event.OfferRefunded,
+  ));
 }
 export function handleOfferWithdrawn(event: OfferWithdrawn): void {
-  updateOfferState(
+  updateOfferState(new OfferBuilder(
     event.transaction.to,
     event.params.taker,
     event.params.index,
     event.block.timestamp,
     event.transaction.hash.toHex(),
-    Event.OfferWithdrawn
-  );
+    Event.OfferWithdrawn,
+  ));
 }
 
 export function handleOfferSubmitted(event: OfferSubmitted): void {
-  updateOfferState(
+  updateOfferState(new OfferBuilder(
     event.transaction.to,
     event.params.taker,
     event.params.index,
     event.block.timestamp,
     event.transaction.hash.toHex(),
-    Event.OfferSubmitted
-  );
+    Event.OfferSubmitted,
+  ));
 }
 
 
