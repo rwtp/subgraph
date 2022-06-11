@@ -128,22 +128,22 @@ function loadOfferDataFromContract(
 }
 
 function loadOfferIPFSData(offerEntity: Offer): Offer | null {
-  const cid = offerEntity.uri.replace("ipfs://", "");
-  let data = ipfs.cat(cid);
-  if (!data) {
-    log.warning("Unable to get data at: {}", [cid]);
-    return null;
-  }
-  const tryValue = json.try_fromBytes(data);
-  const typedMap = tryValue.value.toObject();
-  if (!typedMap) {
-    log.warning("Unable to parse data at: {}", [cid]);
-    return null;
-  }
-  log.info("Parsing data at {}", [cid]);
-  offerEntity.messagePublicKey = getEntryString(typedMap, "publicKey");
-  offerEntity.messageNonce = getEntryString(typedMap, "nonce");
-  offerEntity.message = getEntryString(typedMap, "message");
+  // const cid = offerEntity.uri.replace("ipfs://", "");
+  // let data = ipf3s.cat(cid);
+  // if (!data) {
+  //   log.warning("Unable to get data at: {}", [cid]);
+  //   return null;
+  // }
+  // const tryValue = json.try_fromBytes(data);
+  // const typedMap = tryValue.value.toObject();
+  // if (!typedMap) {
+  //   log.warning("Unable to parse data at: {}", [cid]);
+  //   return null;
+  // }
+  // log.info("Parsing data at {}", [cid]);
+  // offerEntity.messagePublicKey = getEntryString(typedMap, "publicKey");
+  // offerEntity.messageNonce = getEntryString(typedMap, "nonce");
+  // offerEntity.message = getEntryString(typedMap, "message");
   return offerEntity;
 }
 
@@ -222,14 +222,51 @@ function updateOfferState(
 }
 
 export function handleOfferCanceled(event: OfferCanceled): void {
-  updateOfferState(
-    event.transaction.to,
-    event.params.taker,
-    event.params.index,
-    event.block.timestamp,
-    event.transaction.hash.toHex(),
-    Event.OfferCanceled
-  );
+  const taker = event.params.taker;
+  const index = event.params.index;
+  const orderAddress = event.transaction.to;
+  const transactionHash = event.transaction.hash.toHex();
+  const timestamp = event.block.timestamp;
+  if (!orderAddress) {
+   return;
+  }
+
+  let offer: Offer | null = getOffer(taker, index, orderAddress);
+  if (!offer) {
+    return;
+  }
+  offer = loadAllOfferData(orderAddress, offer, taker, index, Event.OfferCanceled, timestamp);
+  if (!offer) {
+    return;
+  }
+  offer.takerCanceled = event.params.takerCanceled;
+  offer.makerCanceled = event.params.makerCanceled;
+
+  if (offer.makerCanceled ===false  &&  offer.takerCanceled === false) {
+    assert(offer.contractState === "Closed");
+    log.info("BOTH CANCELED", []);
+    offer.takerCanceled = true;
+    offer.makerCanceled = true;
+    store.remove('Offer', offer.id);
+    offer.id = offer.id + `-closed-${transactionHash}`;
+  } 
+  if (offer.contractState === "Closed") {
+    log.warning("State closed! maker: {} taker: {} index: {}", [offer.makerCanceled.toString(), offer.takerCanceled.toString(), index.toString()])
+  }
+  let offerTransition = getOfferTransition(taker, index, transactionHash);
+  offerTransition = loadTransitionData(offerTransition, offer, timestamp);
+  offerTransition.save();
+  offer.history = offer.history.concat([offerTransition.id]);
+  
+  offer.save();
+  // updateOfferState(
+  //   event.transaction.to,
+  //   event.params.taker,
+  //   event.params.index,
+  //   event.block.timestamp,
+  //   event.transaction.hash.toHex(),
+  //   Event.OfferCanceled
+  // );
 }
 export function handleOfferCommitted(event: OfferCommitted): void {
   updateOfferState(
