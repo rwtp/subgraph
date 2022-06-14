@@ -4,11 +4,11 @@ schema:
 dataSources:
   - kind: ethereum
     name: OrderBook
-    network: kovan
+    network: rinkeby
     source:
       address: "0xbd2e1dbe56053ee310249ce5969208ad7aa72dd0"
       abi: OrderBook
-      startBlock: 31831656
+      startBlock: 10738878
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.5
@@ -36,7 +36,7 @@ dataSources:
 templates:
   - name: Order
     kind: ethereum/contract
-    network: kovan
+    network: rinkeby
     source:
       abi: Order
     mapping:
@@ -62,5 +62,7 @@ templates:
           handler: handleOfferCommitted
         - event: OfferConfirmed(indexed address,indexed uint128)
           handler: handleOfferConfirmed
+        - event: OfferCanceled(indexed address,indexed uint128,bool,bool)
+          handler: handleOfferCanceled
         - event: OfferRefunded(indexed address,indexed uint128)
           handler: handleOfferRefunded

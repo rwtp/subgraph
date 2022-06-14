@@ -62,5 +62,7 @@ templates:
           handler: handleOfferCommitted
         - event: OfferConfirmed(indexed address,indexed uint128)
           handler: handleOfferConfirmed
+        - event: OfferCanceled(indexed address,indexed uint128,bool,bool)
+          handler: handleOfferCanceled
         - event: OfferRefunded(indexed address,indexed uint128)
           handler: handleOfferRefunded
