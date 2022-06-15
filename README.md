@@ -1,4 +1,13 @@
+# Deploy
 
+```
+# Deploy a specific network
+$ yarn deploy-hosted polygon
+
+# Deploy on all the networks
+$ yarn deploy-all
+```
+Note: Requires there being a file in `/config/` for that network. 
 
 # Making changes and updates
 If the underlying contract changes you can update that by bumping the `rwtp` version in the `package.json`. 
