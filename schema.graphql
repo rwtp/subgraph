@@ -19,10 +19,12 @@ type OrderBook @entity {
 }
 
 type Order @entity {
+  isCurrent: Boolean!
   id: ID!
   orderType: OrderType!
   address: Bytes!
   uri: String!
+  history: [OrderTransition!]!
   title: String
   description: String
   primaryImage: String
@@ -68,6 +70,12 @@ type OfferTransition @entity {
   state: OfferState!
   makerCanceled: Boolean!
   takerCanceled: Boolean!
+}
+
+type OrderTransition @entity {
+  id: ID!
+  timestamp: BigInt!
+  order: Order!
 }
 
 type Offer @entity {
