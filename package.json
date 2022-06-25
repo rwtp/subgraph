@@ -7,7 +7,7 @@
     "deploy-studio": "graph deploy --node https://api.studio.thegraph.com/deploy/ justin-test-rwtp",
     "deploy-hosted": "sh -c 'yarn prepare-hosted ${0} && graph deploy --node https://api.thegraph.com/deploy/ rwtp/${0}'",
     "prepare-hosted": "sh -c 'mustache config/${0}.json subgraph.template.yaml > subgraph.yaml'",
-    "deploy-all": "for x in \"rinkeby-dev\" \"optimism\" \"kovan\" \"mainnet\" \"rinkeby\"; do yarn deploy-hosted $x; done",
+    "deploy-all": "for x in \"rinkeby-dev\" \"optimism\" \"kovan\" \"mainnet\" \"rinkeby\" \"goerli\"; do yarn deploy-hosted $x; done",
     "create-local": "graph create --node http://localhost:8020/ rwtp",
     "remove-local": "graph remove --node http://localhost:8020/ rwtp",
     "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 rwtp"
