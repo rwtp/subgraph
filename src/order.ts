@@ -13,11 +13,13 @@ import {
   OfferConfirmed,
   OfferRefunded,
   OfferWithdrawn,
+  OrderURIChanged,
 } from "../generated/templates/Order/Order";
 import { Order as OrderContract } from "../generated/templates/Order/Order";
-import { Offer, Order, OfferTransition, Token } from "../generated/schema";
+import { Offer, Order, OfferTransition, Token, OrderTransition } from "../generated/schema";
 import { getEntryString } from "./entrySafeUnwrap";
 import { ERC20 } from "../generated/OrderBook/ERC20";
+import {loadOrderIPFSMetaData} from './orderBook';
 
 // TODO: Add in timestamp or something incase the same person orders the same thing twice
 function getOffer(
@@ -247,6 +249,38 @@ function updateOfferState(
 }
 
 
+export function handleOrderURIChanged(event: OrderURIChanged): void {
+  let orderAddress = event.transaction.to;
+  if (!orderAddress) {
+    log.warning("orderAddress null when URI changed", []);
+    return;
+  }
+  let order = Order.load(orderAddress.toHex());
+  if (!order) {
+    log.warning("order null when URI changed", []);
+    return;
+  }
+  let transactionHash = event.transaction.hash.toHex();
+
+  let currentOrderId = order.id;
+  let oldOrderId = currentOrderId + '-' + transactionHash;
+  order.isCurrent = false;
+  order.id = oldOrderId
+  order.save()
+  
+
+  order.isCurrent = true;
+  let uriTransition = new OrderTransition(transactionHash);
+  order.history = order.history.concat([uriTransition.id])
+
+  uriTransition.timestamp = event.block.timestamp;
+  uriTransition.order = oldOrderId;
+  order.id = currentOrderId;
+  order = loadOrderIPFSMetaData(event.params.next, order);
+  uriTransition.save();
+  order.save();
+
+}
 
 export function handleOfferCanceled(event: OfferCanceled): void {
   const offerBuilder = new OfferBuilder (
@@ -385,6 +419,3 @@ function load_erc20_data(
   return offer;
 }
 
-// export function handleOrderURIChanged(event: OrderURIChanged): void {
-
-// }

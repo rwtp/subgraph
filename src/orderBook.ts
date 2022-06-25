@@ -36,13 +36,13 @@ export function handleOwnerChanged(event: OwnerChanged): void {}
 ///   "buyersCostSuggested": "0x024000",
 ///   "suggestedTimeout": "0x024000",
 /// }
-function load_ipfs_meta_data(uri: string, order: Order): Order {
+export function loadOrderIPFSMetaData(uri: string, order: Order): Order {
   const cid = uri.replace("ipfs://", "");
   let data = ipfs.cat(cid);
   if (!data) {
     order.error = `IPFS data not found for ${cid}`;
     log.warning("Unable to get data at: {}", [cid]);
-    return order;
+    data = Bytes.fromUTF8("{}");
   }
   const tryValue = json.try_fromBytes(data);
   const typedMap = tryValue.value.toObject();
@@ -105,10 +105,12 @@ function create_sell_order(
   orderEntity.createdAt = timestamp;
   orderEntity.address = orderAddress;
   orderEntity.offers = [];
+  orderEntity.history = [];
+  orderEntity.isCurrent = true;
   orderEntity.offerCount = BigInt.fromI32(0);
   orderEntity.maker = orderContract.maker();
   orderEntity.uri = orderContract.orderURI();
-  orderEntity = load_ipfs_meta_data(orderEntity.uri, orderEntity);
+  orderEntity = loadOrderIPFSMetaData(orderEntity.uri, orderEntity);
   orderEntity.save();
   return orderEntity;
 }
